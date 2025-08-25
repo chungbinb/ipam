@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API诊断工具</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 8px 16px; margin: 5px; background: #007cba; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #005a87; }
+    </style>
+</head>
+<body>
+    <h1>IT资产管理系统 - API诊断工具</h1>
+    
+    <div class="test-section">
+        <h3>1. 基本连接测试</h3>
+        <button onclick="testBasicConnection()">测试基本连接</button>
+        <div id="basic-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. 登录API测试</h3>
+        <input type="text" id="test-username" placeholder="用户名" value="admin">
+        <input type="password" id="test-password" placeholder="密码" value="123456">
+        <button onclick="testLogin()">测试登录</button>
+        <div id="login-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. 认证检查测试</h3>
+        <button onclick="testAuthCheck()">测试认证状态</button>
+        <div id="auth-result"></div>
+    </div>
+
+    <script>
+        async function testBasicConnection() {
+            const resultDiv = document.getElementById('basic-result');
+            resultDiv.innerHTML = '<p class="info">测试中...</p>';
+            
+            try {
+                const response = await fetch('../index.php', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                const text = await response.text();
+                resultDiv.innerHTML = `
+                    <p class="success">✓ 基本连接成功</p>
+                    <p>状态码: ${response.status}</p>
+                    <p>Content-Type: ${response.headers.get('content-type')}</p>
+                    <pre>${text.substring(0, 500)}${text.length > 500 ? '...' : ''}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">✗ 连接失败: ${error.message}</p>`;
+            }
+        }
+        
+        async function testLogin() {
+            const resultDiv = document.getElementById('login-result');
+            const username = document.getElementById('test-username').value;
+            const password = document.getElementById('test-password').value;
+            
+            resultDiv.innerHTML = '<p class="info">测试中...</p>';
+            
+            try {
+                const response = await fetch('../api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                const contentType = response.headers.get('content-type');
+                let responseText = await response.text();
+                
+                console.log('Raw response:', responseText);
+                
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (e) {
+                    throw new Error(`JSON解析失败: ${e.message}. 原始响应: ${responseText.substring(0, 200)}`);
+                }
+                
+                resultDiv.innerHTML = `
+                    <p class="${data.code === 0 ? 'success' : 'error'}">
+                        ${data.code === 0 ? '✓' : '✗'} 登录${data.code === 0 ? '成功' : '失败'}
+                    </p>
+                    <p>状态码: ${response.status}</p>
+                    <p>Content-Type: ${contentType}</p>
+                    <p>消息: ${data.msg}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">✗ 请求失败: ${error.message}</p>`;
+            }
+        }
+        
+        async function testAuthCheck() {
+            const resultDiv = document.getElementById('auth-result');
+            resultDiv.innerHTML = '<p class="info">测试中...</p>';
+            
+            try {
+                const response = await fetch('../api/auth/check', {
+                    credentials: 'include'
+                });
+                
+                const contentType = response.headers.get('content-type');
+                const text = await response.text();
+                
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`JSON解析失败: ${e.message}. 原始响应: ${text.substring(0, 200)}`);
+                }
+                
+                resultDiv.innerHTML = `
+                    <p class="${data.code === 0 ? 'success' : 'error'}">
+                        ${data.code === 0 ? '✓' : '✗'} 认证检查
+                    </p>
+                    <p>状态码: ${response.status}</p>
+                    <p>Content-Type: ${contentType}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">✗ 请求失败: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
