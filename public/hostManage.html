@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>主机管理</title>
+    <link rel="stylesheet" type="text/css" href="../public/css/Pagestyle.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f8f9fa;
+            min-height: 100vh;
+            /* 新增：让body高度撑满视口，消除底部空白 */
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            /* padding: 40px; max-width: 1200px; margin: 0 auto; */
+            padding: 40px;
+            width: 100vw;
+            max-width: 100vw;
+            min-width: 800px; /* 新增：设置最小宽度 */
+            margin: 0;
+            box-sizing: border-box;
+            flex: 1 1 auto;
+            min-height: 0;
+            /* 让内容区填满剩余空间 */
+            display: flex;
+            flex-direction: column;
+        }
+        h1 { font-size: 2rem; color: #2d3e50; margin-bottom: 32px; }
+        form { margin-bottom: 20px; }
+        input, select, button { margin-right: 8px; padding: 8px 0px; border-radius: 4px; border: 1px solid #ccc; font-size: 15px; }
+        input:focus, select:focus { border-color: #007bff; outline: none; }
+        button { background: #007bff; color: #fff; border: none; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #0056b3; }
+        .table-scroll-x {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            height: 0;
+        }
+        .table-scroll-y {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+            overflow-y: auto;
+            width: 100%;
+            /* 固定高度由父容器撑满，不再动态设置max-height */
+            max-height: none;
+            position: relative;
+        }
+        /* 分页控件区域 */
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            margin-bottom: 8px;
+            background: none;
+            box-shadow: none;
+            border-radius: 0;
+            padding: 0;
+            max-width: none;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        table.host-table {
+            min-width: 1200px;
+            width: 100%; /* 固定宽度为100%，只随浏览器变化 */
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+        }
+        table.host-table th, table.host-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+            /* background: #fff; */
+        }
+        /* 更显眼的交替行背景色 */
+        table.host-table tbody tr:nth-child(odd) {
+            background: #e3eafc;
+        }
+        table.host-table tbody tr:nth-child(even) {
+            background: #f2f4f7;
+        }
+        /* 保证选中/hover时高亮覆盖交替色 */
+        table.host-table tbody tr:hover {
+            background: #b3e5fc !important;
+        }
+        table.host-table th {
+            background: #f4f6fa;
+            color: #2d3e50;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            cursor: pointer;
+            user-select: none;
+        }
+        table.host-table th.sortable:hover {
+            background: #e6f7ff;
+        }
+        table.host-table th.sorted-asc::after {
+            content: " ▲";
+            font-size: 13px;
+            color: #007bff;
+        }
+        table.host-table th.sorted-desc::after {
+            content: " ▼";
+            font-size: 13px;
+            color: #007bff;
+        }
+        table.host-table th:last-child,
+        table.host-table td.action-cell {
+            position: sticky;
+            right: 0;
+            z-index: 11;
+            border-left: 2px solid #f4f6fa !important; /* 绿色竖条 */
+            background: linear-gradient(to right, #25d05b 0px, #fff 3px, #fff 100%);
+            text-align: center;
+            min-width: 120px;
+        }
+        table.host-table th:last-child {
+            background: linear-gradient(to right, #25d05b 0px, #fff 3px, #fff 100%);
+            z-index: 12;
+            border-left: 2px solid #f4f6fa !important; /* 绿色竖条 */
+            text-align: center;
+        }
+        table.host-table td.action-cell {
+            text-align: center;
+            min-width: 120px;
+        }
+        .action-btn { background: none; border: none; color: #007bff; cursor: pointer; margin-right: 8px; }
+        .action-btn.delete { color: #d9534f; }
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            margin-bottom: 8px;
+            background: none;
+            box-shadow: none;
+            border-radius: 0;
+            padding: 0;
+            max-width: none;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .pagination-bar .page-btn {
+            min-width: 32px;
+            padding: 2px 8px;
+            border: 1px solid #e0e0e0;
+            background: #fff;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-bar .page-btn.active {
+            background: #007bff;
+            color: #fff;
+            font-weight: bold;
+            border-color: #007bff;
+        }
+        .pagination-bar .page-btn:disabled {
+            color: #aaa;
+            background: #f4f6fa;
+            cursor: not-allowed;
+        }
+        .pagination-bar .jump-input {
+            width: 48px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            margin-left: 8px;
+        }
+        .pagination-bar .jump-btn {
+            padding: 2px 10px;
+            border-radius: 4px;
+            border: none;
+            background: #007bff;
+            color: #fff;
+            margin-left: 2px;
+            cursor: pointer;
+        }
+        .pagination-bar .jump-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 查询表单 -->
+        <form id="hostSearchForm" style="margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button type="button" id="toggleAdvancedSearchBtn" style="order:0;background:none;color:#222;font-weight:500;display:flex;align-items:center;gap:4px;">
+                高级搜索
+                <span style="display:inline-block;transform:rotate(90deg);font-size:16px;">&#9654;</span>
+            </button>
+            <div style="position:relative;flex:1;min-width:220px;max-width:340px;order:1;">
+                <input type="text" name="keyword" placeholder="关键词模糊搜索" style="width:100%;">
+                <button type="submit" style="position:absolute;right:0;top:50%;transform:translateY(-50%);background:none;border:none;padding:0 10px;margin:0;cursor:pointer;">
+                    <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+                        <circle cx="9" cy="9" r="7" stroke="#007bff" stroke-width="2"/>
+                        <line x1="15" y1="15" x2="19" y2="19" stroke="#007bff" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+        </form>
+        <!-- 高级搜索区域，默认隐藏 -->
+        <div id="advancedSearchPanel" style="display:none;margin-bottom:18px;padding:18px 24px;background:#fff;border-radius:8px;box-shadow:0 2px 8px #0001;">
+            <form id="hostAdvancedSearchForm" style="display:flex;flex-wrap:wrap;gap:16px;">
+                <input type="text" name="department" placeholder="部门" style="width:160px;">
+                <input type="text" name="user" placeholder="使用人员" style="width:160px;">
+                <input type="text" name="cpu" placeholder="CPU" style="width:120px;">
+                <input type="text" name="memory" placeholder="内存" style="width:120px;">
+                <input type="text" name="disk" placeholder="硬盘" style="width:120px;">
+                <input type="text" name="ip" placeholder="IP地址" style="width:140px;">
+                <input type="text" name="mac" placeholder="MAC地址" style="width:140px;">
+                <input type="text" name="host_number" placeholder="主机编号" style="width:120px;">
+                <input type="text" name="monitor_number" placeholder="显示器编号" style="width:120px;">
+                <input type="text" name="printer_number" placeholder="打印机/编号" style="width:120px;">
+                <input type="text" name="account" placeholder="共享账号" style="width:140px;">
+                <input type="text" name="supplier" placeholder="供应商" style="width:120px;">
+                <input type="text" name="remark" placeholder="备注" style="width:120px;">
+                <button type="submit" style="background:#007bff;color:#fff;">精确查询</button>
+                <button type="button" id="resetAdvancedSearchBtn" style="background:#6c757d;color:#fff;">重置</button>
+            </form>
+        </div>
+        <!-- 操作按钮 -->
+        <div style="margin-bottom:12px;display:flex;gap:12px;">
+            <button id="addHostBtn" style="background:#007bff;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">新增主机</button>
+            <button id="batchDeleteHostBtn" style="background:#d9534f;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">批量删除</button>
+            <button id="importHostBtn" style="background:#43b1ea;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">导入</button>
+            <button id="exportHostBtn" style="background:#43b1ea;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">导出</button>
+        </div>
+        <!-- 主机列表 -->
+        <div class="table-scroll-x">
+            <div class="table-scroll-y" id="hostTableScrollY">
+                <table class="host-table" id="hostTable">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;text-align:center;">
+                                <input type="checkbox" id="selectAllHost" style="cursor:pointer;">
+                            </th>
+                            <th class="sortable" data-field="index">序号</th>
+                            <th class="sortable" data-field="department">部门</th>
+                            <th class="sortable" data-field="user">使用人员</th>
+                            <th class="sortable" data-field="cpu">CPU</th>
+                            <th class="sortable" data-field="memory">内存</th>
+                            <th class="sortable" data-field="disk">硬盘</th>
+                            <th class="sortable" data-field="ip">IP地址</th>
+                            <th class="sortable" data-field="mac">MAC地址</th>
+                            <th class="sortable" data-field="host_number">主机编号</th>
+                            <th class="sortable" data-field="monitor_number">显示器编号</th>
+                            <th class="sortable" data-field="printer_number">打印机/编号</th>
+                            <th class="sortable" data-field="account">0.1/10.15共享账号</th>
+                            <th class="sortable" data-field="supplier">供应商</th>
+                            <th class="sortable" data-field="remark">备注</th>
+                            <th class="sortable" data-field="updated_at">更新时间</th>
+                            <th style="min-width:120px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hostTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <!-- 新增主机抽屉 -->
+        <div id="addHostDrawer" style="position:fixed;top:0;right:-520px;width:500px;height:100vh;background:#fff;box-shadow:-2px 0 16px #0002;z-index:9999;transition:right 0.3s;overflow-y:auto;">
+            <div style="padding:32px 24px;">
+                <h2 style="margin-top:0;">新增主机</h2>
+                <form id="addHostForm">
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">
+                            <span style="color:red">*</span> 部门
+                        </label>
+                        <select name="department" id="addHostDepartmentSelect" required style="flex:1;">
+                            <option value="">请选择部门</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">
+                            <span style="color:red">*</span> 使用人员
+                        </label>
+                        <input type="text" name="user" placeholder="使用人员" required style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">CPU</label>
+                        <input type="text" name="cpu" placeholder="CPU" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">内存</label>
+                        <input type="text" name="memory" placeholder="内存" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">硬盘</label>
+                        <input type="text" name="disk" placeholder="硬盘" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">IP地址</label>
+                        <input type="text" name="ip" placeholder="IP地址" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">MAC地址</label>
+                        <input type="text" name="mac" placeholder="MAC地址" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">主机编号</label>
+                        <select id="addHostPcPrefix" style="width:110px;">
+                            <option value="PC-A">PC-A</option>
+                            <option value="PC-B">PC-B</option>
+                            <option value="PC-C">PC-C</option>
+                            <option value="PC-D">PC-D</option>
+                            <option value="PC-E">PC-E</option>
+                            <option value="PC-F">PC-F</option>
+                            <option value="PC-X">PC-X</option>
+                        </select>
+                        <input type="text" name="host_number_suffix" id="addHostPcSuffix" maxlength="4" placeholder="4位数字" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">显示器编号</label>
+                        <select id="addMonitorPrefix" style="width:110px;">
+                            <option value="Monitor-A">Monitor-A</option>
+                            <option value="Monitor-B">Monitor-B</option>
+                            <option value="Monitor-C">Monitor-C</option>
+                            <option value="Monitor-D">Monitor-D</option>
+                            <option value="Monitor-E">Monitor-E</option>
+                            <option value="Monitor-F">Monitor-F</option>
+                            <option value="Monitor-X">Monitor-X</option>
+                        </select>
+                        <input type="text" name="monitor_number_suffix" id="addMonitorSuffix" maxlength="4" placeholder="4位数字" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">打印机</label>
+                        <input type="text" name="printer_number" placeholder="格式：打印机型号/打印机编号" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">共享账号</label>
+                        <input type="text" name="account" placeholder="0.1/10.15的共享账号" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">供应商</label>
+                        <input type="text" name="supplier" placeholder="供应商" style="flex:1;">
+                    </div>
+                    <div style="margin-bottom:18px;display:flex;align-items:center;">
+                        <label style="font-weight:500;color:#2d3e50;width:110px;">备注</label>
+                        <input type="text" name="remark" placeholder="备注" style="flex:1;">
+                    </div>
+                    <div style="text-align:right;margin-top:18px;">
+                        <button type="submit" style="background:#007bff;color:#fff;padding:8px 32px;border-radius:6px;">提交</button>
+                        <button type="button" id="closeAddHostDrawerBtn" style="background:#6c757d;color:#fff;padding:8px 32px;border-radius:6px;margin-left:8px;">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 遮罩层 -->
+        <div id="addHostDrawerMask" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9998;"></div>
+        <!-- 分页控件和统计条数 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;">
+            <div id="hostCountBar"></div>
+            <div>
+                每页
+                <select id="hostPageSizeSelect" style="padding:4px 12px;">
+                    <option value="10">10行</option>
+                    <option value="20" selected>20行</option>
+                    <option value="50">50行</option>
+                </select>
+            </div>
+            <div id="hostPaginationBar" class="pagination-bar"></div>
+        </div>
+    </div>
+    <script>
+        // 数据变量
+        let hostList = [];
+        let filteredList = [];
+        let currentPage = 1;
+        let pageSize = 20;
+
+        // 排序相关变量
+        let sortField = '';
+        let sortOrder = ''; // 'asc' 或 'desc'
+
+        // 渲染主机表格
+        function renderHostTablePage() {
+            const total = filteredList.length;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            currentPage = Math.min(currentPage, totalPages);
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, total);
+            const pageData = filteredList.slice(startIdx, endIdx);
+
+            const tbody = document.getElementById('hostTableBody');
+            tbody.innerHTML = '';
+            pageData.forEach((item, idx) => {
+                // 格式化更新时间只显示年月日
+                let updatedAt = item.updated_at || '';
+                if (updatedAt) {
+                    let d = new Date(updatedAt);
+                    if (!isNaN(d.getTime())) {
+                        let y = d.getFullYear();
+                        let m = d.getMonth() + 1;
+                        let day = d.getDate();
+                        updatedAt = `${y}/${m}/${day}`;
+                    } else {
+                        updatedAt = item.updated_at;
+                    }
+                }
+                // 判断是否为编辑状态
+                const isEditing = item._editing;
+                const tr = document.createElement('tr');
+                if (isEditing) {
+                    tr.innerHTML = `
+                        <td style="text-align:center;">
+                            <input type="checkbox" class="rowHostCheckbox" data-id="${item.id}" style="cursor:pointer;" disabled>
+                        </td>
+                        <td>${startIdx + idx + 1}</td>
+                        <td><input type="text" value="${item.department || ''}" class="edit-input" data-field="department" style="width:100%;"></td>
+                        <td><input type="text" value="${item.user || ''}" class="edit-input" data-field="user" style="width:100%;"></td>
+                        <td><input type="text" value="${item.cpu || ''}" class="edit-input" data-field="cpu" style="width:100%;"></td>
+                        <td><input type="text" value="${item.memory || ''}" class="edit-input" data-field="memory" style="width:100%;"></td>
+                        <td><input type="text" value="${item.disk || ''}" class="edit-input" data-field="disk" style="width:100%;"></td>
+                        <td><input type="text" value="${item.ip || ''}" class="edit-input" data-field="ip" style="width:100%;"></td>
+                        <td><input type="text" value="${item.mac || ''}" class="edit-input" data-field="mac" style="width:100%;"></td>
+                        <td><input type="text" value="${item.host_number || ''}" class="edit-input" data-field="host_number" style="width:100%;"></td>
+                        <td><input type="text" value="${item.monitor_number || ''}" class="edit-input" data-field="monitor_number" style="width:100%;"></td>
+                        <td><input type="text" value="${item.printer_number || ''}" class="edit-input" data-field="printer_number" style="width:100%;"></td>
+                        <td><input type="text" value="${item.account || ''}" class="edit-input" data-field="account" style="width:100%;"></td>
+                        <td><input type="text" value="${item.supplier || ''}" class="edit-input" data-field="supplier" style="width:100%;"></td>
+                        <td><input type="text" value="${item.remark || ''}" class="edit-input" data-field="remark" style="width:100%;"></td>
+                        <td>${updatedAt}</td>
+                        <td class="action-cell">
+                            <button class="action-btn" onclick="saveHostEdit(${item.id})">
+                                <span style="vertical-align:middle;">
+                                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M5 10l4 4 6-8" stroke="#007bff" stroke-width="2" fill="none"/></svg>
+                                </span>
+                                保存
+                            </button>
+                            <button class="action-btn delete" onclick="cancelHostEdit(${item.id})">
+                                <span style="vertical-align:middle;">
+                                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><line x1="6" y1="6" x2="14" y2="14" stroke="#d9534f" stroke-width="2"/><line x1="14" y1="6" x2="6" y2="14" stroke="#d9534f" stroke-width="2"/></svg>
+                                </span>
+                                取消
+                            </button>
+                        </td>
+                    `;
+                } else {
+                    tr.innerHTML = `
+                        <td style="text-align:center;">
+                            <input type="checkbox" class="rowHostCheckbox" data-id="${item.id}" style="cursor:pointer;">
+                        </td>
+                        <td>${startIdx + idx + 1}</td>
+                        <td>${item.department || ''}</td>
+                        <td>${item.user || ''}</td>
+                        <td>${item.cpu || ''}</td>
+                        <td>${item.memory || ''}</td>
+                        <td>${item.disk || ''}</td>
+                        <td>${item.ip || ''}</td>
+                        <td>${item.mac || ''}</td>
+                        <td>${item.host_number || ''}</td>
+                        <td>${item.monitor_number || ''}</td>
+                        <td>${item.printer_number || ''}</td>
+                        <td>${item.account || ''}</td>
+                        <td>${item.supplier || ''}</td>
+                        <td>${item.remark || ''}</td>
+                        <td>${updatedAt}</td>
+                        <td class="action-cell">
+                            <button class="action-btn" onclick="editHost(${item.id})">
+                                <span style="vertical-align:middle;">
+                                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M4 13.5V16h2.5l7.1-7.1a1 1 0 0 0-1.4-1.4L5 14.6z" stroke="#007bff" stroke-width="1.5" fill="none"/><path d="M14.7 6.3a1 1 0 0 1 1.4 1.4l-1.4-1.4z" stroke="#007bff" stroke-width="1.5" fill="none"/></svg>
+                                </span>
+                                编辑
+                            </button>
+                            <button class="action-btn delete" onclick="deleteHost(${item.id})">
+                                <span style="vertical-align:middle;">
+                                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="5" y="7" width="10" height="8" rx="2" stroke="#d9534f" stroke-width="2" fill="none"/><path d="M3 7h14" stroke="#d9534f" stroke-width="2"/><path d="M8 7V5a2 2 0 0 1 4 0v2" stroke="#d9534f" stroke-width="2"/></svg>
+                                </span>
+                                删除
+                            </button>
+                        </td>
+                    `;
+                }
+                tbody.appendChild(tr);
+            });
+
+            // 绑定全选和行选
+            const selectAll = document.getElementById('selectAllHost');
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.onclick = function() {
+                    const checked = this.checked;
+                    document.querySelectorAll('.rowHostCheckbox').forEach(cb => { cb.checked = checked; });
+                };
+            }
+            document.querySelectorAll('.rowHostCheckbox').forEach(cb => {
+                cb.onclick = function() {
+                    const all = document.querySelectorAll('.rowHostCheckbox');
+                    const allChecked = Array.from(all).every(x => x.checked);
+                    if (selectAll) selectAll.checked = allChecked;
+                };
+            });
+
+            renderHostPaginationBar(totalPages);
+            document.getElementById('hostCountBar').innerText = `共 ${total} 条数据`;
+
+            // 高亮排序箭头
+            document.querySelectorAll('#hostTable thead th.sortable').forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+                const field = th.getAttribute('data-field');
+                if (field === sortField) {
+                    th.classList.add(sortOrder === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                }
+            });
+        }
+
+        function renderHostPaginationBar(totalPages) {
+            const bar = document.getElementById('hostPaginationBar');
+            const total = filteredList.length;
+            if (totalPages <= 1) {
+                bar.innerHTML = '';
+                return;
+            }
+            let html = '';
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoHostPage(1)">首页</button>`;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoHostPage(${currentPage - 1})">上一页</button>`;
+            let pageBtns = [];
+            let maxShow = 7;
+            if (totalPages <= maxShow) {
+                for (let i = 1; i <= totalPages; i++) {
+                    pageBtns.push(i);
+                }
+            } else {
+                if (currentPage <= 4) {
+                    pageBtns = [1,2,3,4,5,'...',totalPages];
+                } else if (currentPage >= totalPages - 3) {
+                    pageBtns = [1,'...',totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages];
+                } else {
+                    pageBtns = [1,'...',currentPage-1,currentPage,currentPage+1,'...',totalPages];
+                }
+            }
+            pageBtns.forEach(p => {
+                if (p === '...') {
+                    html += `<span style="padding:0 4px;">...</span>`;
+                } else {
+                    html += `<button class="page-btn${p===currentPage?' active':''}" onclick="gotoHostPage(${p})">${p}</button>`;
+                }
+            });
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoHostPage(${currentPage + 1})">下一页</button>`;
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoHostPage(${totalPages})">末页</button>`;
+            html += `<span style="margin-left:8px;">跳至</span>
+                <input type="number" min="1" max="${totalPages}" id="hostJumpPageInput" class="jump-input" value="${currentPage}">
+                <button class="jump-btn" onclick="hostJumpToPage(${totalPages})">确定</button>`;
+            bar.innerHTML = html;
+            document.getElementById('hostJumpPageInput').onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    hostJumpToPage(totalPages);
+                }
+            };
+        }
+
+        window.gotoHostPage = function(page) {
+            page = Math.max(1, Math.min(page, Math.ceil(filteredList.length / pageSize)));
+            currentPage = page;
+            renderHostTablePage();
+        };
+
+        window.hostJumpToPage = function(totalPages) {
+            const input = document.getElementById('hostJumpPageInput');
+            let val = parseInt(input.value, 10);
+            if (!val || val < 1 || val > totalPages) return;
+            gotoHostPage(val);
+        };
+
+        document.getElementById('hostPageSizeSelect').onchange = function() {
+            pageSize = parseInt(this.value, 10);
+            currentPage = 1;
+            renderHostTablePage();
+        };
+
+        // 查询表单
+        document.getElementById('hostSearchForm').onsubmit = function(e) {
+            e.preventDefault();
+            const keyword = this.keyword.value.trim();
+            if (!keyword) {
+                filteredList = hostList;
+            } else {
+                filteredList = hostList.filter(item => {
+                    return Object.values(item).some(val =>
+                        val && String(val).toLowerCase().includes(keyword.toLowerCase())
+                    );
+                });
+            }
+            currentPage = 1;
+            renderHostTablePage();
+        };
+
+        // 新增/编辑/删除/批量删除操作（需后端API支持）
+        function fetchHostList() {
+            fetch('../api/host')
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        hostList = res.data;
+                        filteredList = hostList;
+                        renderHostTablePage();
+                    } else {
+                        hostList = [];
+                        filteredList = [];
+                        renderHostTablePage();
+                    }
+                });
+        }
+
+        function addHost(data, cb) {
+            fetch('../api/host', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) fetchHostList();
+                if (cb) cb(res);
+            });
+        }
+        // 编辑按钮逻辑
+        window.editHost = function(id) {
+            // 只允许单行编辑
+            filteredList.forEach(item => { delete item._editing; });
+            let found = filteredList.find(item => item.id == id);
+            if (found) found._editing = true;
+            renderHostTablePage();
+        };
+
+        // 保存按钮逻辑
+        window.saveHostEdit = function(id) {
+            let found = filteredList.find(item => item.id == id);
+            if (!found) return;
+            // 获取编辑行的所有input
+            const tr = document.querySelector(`.action-btn[onclick="saveHostEdit(${id})"]`).closest('tr');
+            const inputs = tr.querySelectorAll('.edit-input');
+            let data = {};
+            inputs.forEach(input => {
+                data[input.getAttribute('data-field')] = input.value;
+            });
+            // 不传 updated_at，由后端自动更新时间
+            delete found._editing;
+            fetch('../api/host/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => {
+                // 首先检查响应是否为JSON
+                const contentType = res.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('服务器返回非JSON响应，可能是PHP错误');
+                }
+                return res.json();
+            })
+            .then(res => {
+                if (res.code === 0) {
+                    fetchHostList();
+                } else {
+                    alert(res.msg || '保存失败'); // 新增：展示后端错误
+                    renderHostTablePage();
+                }
+            })
+            .catch(err => {
+                console.error('保存主机编辑失败:', err);
+                alert('保存失败: ' + err.message);
+                renderHostTablePage();
+            });
+        };
+
+        // 取消按钮逻辑
+        window.cancelHostEdit = function(id) {
+            let found = filteredList.find(item => item.id == id);
+            if (found) delete found._editing;
+            renderHostTablePage();
+        };
+
+        function deleteHost(id) {
+            if (!confirm('确定要删除该主机吗？')) return;
+            fetch('../api/host/' + id, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) fetchHostList();
+            });
+        }
+        function batchDeleteHost(ids, cb) {
+            fetch('../api/host/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) fetchHostList();
+                if (cb) cb(res);
+            });
+        }
+
+        // 批量删除按钮逻辑
+        document.getElementById('batchDeleteHostBtn').onclick = function() {
+            const checkedBoxes = Array.from(document.querySelectorAll('.rowHostCheckbox')).filter(cb => cb.checked);
+            if (checkedBoxes.length === 0) {
+                alert('请先选择要删除的主机');
+                return;
+            }
+            if (!confirm(`确定要删除选中的${checkedBoxes.length}项吗？`)) return;
+            const ids = checkedBoxes.map(cb => cb.getAttribute('data-id'));
+            batchDeleteHost(ids);
+        };
+
+        // 新增弹窗逻辑（可扩展为抽屉弹窗）
+        document.getElementById('addHostBtn').onclick = function() {
+            alert('新增主机功能待实现');
+        };
+
+        // 导入按钮逻辑
+        document.getElementById('importHostBtn').onclick = function() {
+            // 创建文件选择框
+            let input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.xlsx,.xls';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (typeof XLSX === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+                    script.onload = function() {
+                        handleImportFile(file);
+                    };
+                    document.body.appendChild(script);
+                } else {
+                    handleImportFile(file);
+                }
+            };
+            input.click();
+        };
+
+        function handleImportFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+                if (!json.length) {
+                    alert('表格无数据');
+                    return;
+                }
+                // 字段映射（表头名称到数据库字段）
+                const fieldMap = {
+                    '部门': 'department',
+                    '使用人员': 'user',
+                    'CPU': 'cpu',
+                    '内存': 'memory',
+                    '硬盘': 'disk',
+                    'IP地址': 'ip',
+                    'MAC地址': 'mac',
+                    '主机编号': 'host_number',
+                    '显示器编号': 'monitor_number',
+                    '打印机/编号': 'printer_number',
+                    '0.1/10.15共享账号': 'account',
+                    '供应商': 'supplier',
+                    '备注': 'remark',
+                    '更新时间': 'updated_at'
+                };
+                // 转换为后端字段
+                const importData = json.map(row => {
+                    let obj = {};
+                    Object.keys(fieldMap).forEach(k => {
+                        if (row[k] !== undefined) obj[fieldMap[k]] = row[k];
+                    });
+                    // 日期格式转换（只保留年月日，无时分秒）
+                    if (obj.updated_at) {
+                        let val = obj.updated_at;
+                        let d;
+                        if (/^\d+$/.test(val)) {
+                            // Excel序列号转日期
+                            d = new Date(Date.UTC(1899, 11, 30) + parseInt(val, 10) * 86400000);
+                        } else {
+                            d = new Date(val);
+                        }
+                        if (!isNaN(d.getTime())) {
+                            // 格式化为 YYYY/MM/DD
+                            let y = d.getFullYear();
+                            let m = d.getMonth() + 1;
+                            let day = d.getDate();
+                            obj.updated_at = `${y}/${m}/${day}`;
+                        }
+                    }
+                    return obj;
+                });
+                // 批量导入（逐条POST，或可改为后端批量接口）
+                let successCount = 0;
+                let failCount = 0;
+                let total = importData.length;
+                let finished = 0;
+                importData.forEach(item => {
+                    fetch('../api/host', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(item)
+                    })
+                    .then(res => res.json())
+                    .then(res => {
+                        finished++;
+                        if (res.code === 0) successCount++;
+                        else failCount++;
+                        if (finished === total) {
+                            alert(`导入完成：成功${successCount}条，失败${failCount}条`);
+                            fetchHostList();
+                        }
+                    })
+                    .catch(() => {
+                        finished++;
+                        failCount++;
+                        if (finished === total) {
+                            alert(`导入完成：成功${successCount}条，失败${failCount}条`);
+                            fetchHostList();
+                        }
+                    });
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 导出按钮逻辑
+        document.getElementById('exportHostBtn').onclick = function() {
+            // 导出所有主机数据为xlsx
+            fetch('../api/host')
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0 && Array.isArray(res.data) && res.data.length) {
+                        exportHostTableXlsx(res.data);
+                    } else {
+                        alert('没有可导出的数据');
+                    }
+                });
+        };
+
+        // 使用 SheetJS 导出为xlsx
+        function exportHostTableXlsx(data) {
+            // 表头
+            const headers = [
+                '部门','使用人员','CPU','内存','硬盘','IP地址','MAC地址','主机编号','显示器编号','打印机/编号','0.1/10.15共享账号','供应商','备注','更新时间'
+            ];
+            // 生成二维数组
+            const rows = [headers];
+            data.forEach(row => {
+                rows.push([
+                    row.department || '',
+                    row.user || '',
+                    row.cpu || '',
+                    row.memory || '',
+                    row.disk || '',
+                    row.ip || '',
+                    row.mac || '',
+                    row.host_number || '',
+                    row.monitor_number || '',
+                    row.printer_number || '',
+                    row.account || '',
+                    row.supplier || '',
+                    row.remark || '',
+                    row.updated_at || ''
+                ]);
+            });
+            // SheetJS导出
+            if (typeof XLSX === 'undefined') {
+                // 动态加载 SheetJS
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+                script.onload = function() {
+                    exportHostTableXlsx(data);
+                };
+                document.body.appendChild(script);
+                return;
+            }
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '主机管理');
+            XLSX.writeFile(wb, '主机管理导出.xlsx');
+        }
+
+        // 高级搜索展开/收起逻辑
+        document.getElementById('toggleAdvancedSearchBtn').onclick = function() {
+            const panel = document.getElementById('advancedSearchPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        };
+
+        // 高级搜索表单提交
+        document.getElementById('hostAdvancedSearchForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            filteredList = hostList.filter(item => {
+                return (!fd.get('department') || (item.department||'').includes(fd.get('department')))
+                    && (!fd.get('user') || (item.user||'').includes(fd.get('user')))
+                    && (!fd.get('cpu') || (item.cpu||'').includes(fd.get('cpu')))
+                    && (!fd.get('memory') || (item.memory||'').includes(fd.get('memory')))
+                    && (!fd.get('disk') || (item.disk||'').includes(fd.get('disk')))
+                    && (!fd.get('ip') || (item.ip||'').includes(fd.get('ip')))
+                    && (!fd.get('mac') || (item.mac||'').includes(fd.get('mac')))
+                    && (!fd.get('host_number') || (item.host_number||'').includes(fd.get('host_number')))
+                    && (!fd.get('monitor_number') || (item.monitor_number||'').includes(fd.get('monitor_number')))
+                    && (!fd.get('printer_number') || (item.printer_number||'').includes(fd.get('printer_number')))
+                    && (!fd.get('account') || (item.account||'').includes(fd.get('account')))
+                    && (!fd.get('supplier') || (item.supplier||'').includes(fd.get('supplier')))
+                    && (!fd.get('remark') || (item.remark||'').includes(fd.get('remark')));
+            });
+            currentPage = 1;
+            renderHostTablePage();
+        };
+
+        // 高级搜索重置
+        document.getElementById('resetAdvancedSearchBtn').onclick = function() {
+            document.getElementById('hostAdvancedSearchForm').reset();
+            filteredList = hostList;
+            currentPage = 1;
+            renderHostTablePage();
+        };
+
+        // 页面加载时自动获取数据
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchHostList();
+        });
+
+        // 新增主机抽屉逻辑
+        const addHostDrawer = document.getElementById('addHostDrawer');
+        const addHostDrawerMask = document.getElementById('addHostDrawerMask');
+        document.getElementById('addHostBtn').onclick = function() {
+            addHostDrawer.style.right = '0';
+            addHostDrawerMask.style.display = 'block';
+            // 拉取部门列表
+            fetch('../api/department')
+                .then(res => res.json())
+                .then(res => {
+                    const select = document.getElementById('addHostDepartmentSelect');
+                    select.innerHTML = '<option value="">请选择部门</option>';
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        res.data.forEach(dep => {
+                            select.innerHTML += `<option value="${dep.name}">${dep.name}</option>`;
+                        });
+                    }
+                });
+        };
+        document.getElementById('closeAddHostDrawerBtn').onclick = function() {
+            addHostDrawer.style.right = '-520px';
+            addHostDrawerMask.style.display = 'none';
+        };
+        addHostDrawerMask.onclick = function() {
+            addHostDrawer.style.right = '-520px';
+            addHostDrawerMask.style.display = 'none';
+        };
+        document.getElementById('addHostForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            let data = {};
+            fd.forEach((v, k) => { data[k] = v; });
+
+            // 处理主机编号和显示器编号后缀补零
+            let hostSuffix = data.host_number_suffix ? data.host_number_suffix.trim() : '';
+            let monitorSuffix = data.monitor_number_suffix ? data.monitor_number_suffix.trim() : '';
+            if (hostSuffix) {
+                // 只允许数字，去除前导零后补足4位
+                if (!/^\d+$/.test(hostSuffix)) {
+                    alert('主机编号后缀只能输入数字');
+                    return;
+                }
+                hostSuffix = String(parseInt(hostSuffix, 10)).padStart(4, '0');
+            }
+            if (monitorSuffix) {
+                if (!/^\d+$/.test(monitorSuffix)) {
+                    alert('显示器编号后缀只能输入数字');
+                    return;
+                }
+                monitorSuffix = String(parseInt(monitorSuffix, 10)).padStart(4, '0');
+            }
+            data.host_number = hostSuffix ? (document.getElementById('addHostPcPrefix').value + hostSuffix) : '';
+            data.monitor_number = monitorSuffix ? (document.getElementById('addMonitorPrefix').value + monitorSuffix) : '';
+
+            // 校验必填
+            if (!data.department || !data.user) {
+                alert('部门和使用人员为必填项');
+                return;
+            }
+            // 校验主机编号和显示器编号后缀（允许为空或4位数字）
+            if (hostSuffix && !/^\d{4}$/.test(hostSuffix)) {
+                alert('主机编号后缀必须为4位数字或为空');
+                return;
+            }
+            if (monitorSuffix && !/^\d{4}$/.test(monitorSuffix)) {
+                alert('显示器编号后缀必须为4位数字或为空');
+                return;
+            }
+            addHost(data, function(res) {
+                if (res.code === 0) {
+                    addHostDrawer.style.right = '-520px';
+                    addHostDrawerMask.style.display = 'none';
+                    document.getElementById('addHostForm').reset();
+                } else {
+                    alert(res.msg || '新增失败'); // 新增：展示后端错误
+                }
+            });
+        };
+    </script>
+</body>
+</html>

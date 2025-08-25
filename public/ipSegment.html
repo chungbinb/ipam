@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>IP段管理</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f8f9fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            padding: 40px;
+            width: 100vw;
+            max-width: 100vw;
+            min-width: 800px;
+            margin: 0;
+            box-sizing: border-box;
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        h1 { font-size: 2rem; color: #2d3e50; margin-bottom: 32px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #fff; box-shadow: 0 2px 8px #0001; }
+        th, td { border: 1px solid #e0e0e0; padding: 10px 12px; text-align: left; }
+        th { background: #f4f6fa; color: #2d3e50; font-weight: 500; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        form { margin-bottom: 20px; }
+        input, select, button { margin-right: 8px; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 15px; }
+        input:focus, select:focus { border-color: #007bff; outline: none; }
+        button { background: #007bff; color: #fff; border: none; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #0056b3; }
+        .stat-card {
+            flex:1;
+            background:#007bff;
+            padding:24px;
+            border-radius:10px;
+            box-shadow:0 2px 8px #0001;
+            text-align:center;
+            color: #fff;
+        }
+        .stat-card div:first-child {
+            font-size:32px;
+            font-weight:bold;
+            color:#fff;
+        }
+        .stat-card div:last-child {
+            color:#fff;
+            margin-top:8px;
+        }
+        #addModal, #deleteModal, #editModal {
+            display:none; position:fixed; top:0; left:0; width:100vw; height:100vh;
+            background:rgba(0,0,0,0.18); z-index:999;
+        }
+        #addModal.show, #deleteModal.show, #editModal.show {
+            display: block;
+        }
+        .modal-content {
+            position: absolute;
+            top: 0; right: 0;
+            width: 400px; height: 100vh;
+            background: #fff; padding:32px 24px; border-radius:10px 0 0 10px;
+            box-shadow: -2px 0 16px #0002;
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.7s cubic-bezier(.4,0,.2,1);
+        }
+        .modal-content.active {
+            transform: translateX(0);
+        }
+        .modal-content h3 { margin-top:0; color:#2d3e50; }
+        .modal-content label { font-weight:500; color:#2d3e50; }
+        .modal-content input, .modal-content select { width:100%; margin-bottom:12px; }
+        .modal-actions { text-align:right; margin-top:16px; }
+        .modal-actions button { margin-left:8px; }
+        .danger-btn { background:#d9534f; }
+        .danger-btn:hover { background:#b52a1a; }
+        #deleteModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.18); z-index: 999;
+        }
+        #deleteModal.show {
+            display: block;
+        }
+        #deleteModal .modal-content {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 320px;
+            min-width: 260px;
+            text-align: center;
+            background: #fff;
+            padding: 32px 24px;
+            border-radius: 10px;
+            box-shadow: 0 2px 16px #0002;
+            height: auto !important; /* 直接规定高度为自适应内容 */
+            max-height: 90vh;        /* 最多不超过视口高度 */
+            overflow-y: auto;        /* 内容超出时可滚动 */
+        }
+        .segment-detail-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.18); z-index: 2000;
+        }
+        .segment-detail-modal.show {
+            display: block;
+        }
+        .segment-detail-content {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 24px #0003;
+            width: 700px;
+            max-width: 96vw;
+            max-height: 90vh;
+            padding: 32px 32px 24px 32px;
+            overflow-y: auto;
+            transition: transform 0.4s cubic-bezier(.4,0,.2,1), opacity 0.4s cubic-bezier(.4,0,.2,1);
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        .segment-detail-content.animating {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.7);
+        }
+        .segment-detail-content.closing {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.7);
+        }
+        .segment-detail-modal.show .segment-detail-content:not(.animating):not(.closing) {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        .segment-detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+        .segment-detail-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #2d3e50;
+        }
+        .segment-detail-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .segment-detail-actions button {
+            background: #eee;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .segment-detail-actions .close-btn {
+            color: #d9534f;
+            font-weight: bold;
+        }
+        .segment-detail-actions .fullscreen-btn {
+            color: #007bff;
+        }
+        .segment-status-label {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 16px;
+            font-size: 15px;
+            font-weight: 500;
+            margin-right: 12px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        .status-used { background: #007bff; }
+        .status-unused { background: #6c757d; }
+        .status-manual { background: #ff9800; }
+        .segment-ip-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
+            gap: 6px;
+            margin: 18px 0 24px 0;
+        }
+        .segment-ip-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 38px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            color: #fff;
+            background: #6c757d;
+            user-select: none;
+            transition: background 0.2s;
+            cursor: pointer; /* 新增：鼠标变为手型 */
+        }
+        .segment-ip-cell.used { background: #007bff; }
+        .segment-ip-cell.manual { background: #ff9800; }
+        .segment-ip-cell.unused { background: #6c757d; }
+        .segment-detail-footer {
+            text-align: center;
+            margin-top: 18px;
+        }
+        .segment-detail-footer button {
+            padding: 8px 32px;
+            border-radius: 6px;
+            background: #007bff;
+            color: #fff;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        @media (max-width: 800px) {
+            .segment-detail-content { width: 98vw; padding: 12px; }
+        }
+        .segment-detail-modal.fullscreen .segment-detail-content {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none;
+            max-height: none;
+            border-radius: 0;
+            top: 0; left: 0;
+            transform: none;
+            padding: 24px 8px 16px 8px;
+        }
+        .ip-tooltip {
+            position: fixed;
+            z-index: 3000;
+            background: #222;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 14px;
+            pointer-events: none;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.15s;
+            box-shadow: 0 2px 8px #0005;
+        }
+        .ip-tooltip.show {
+            opacity: 1;
+        }
+        .modal-ip-edit {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.18); z-index: 3000;
+        }
+        .modal-ip-edit.show {
+            display: block;
+        }
+        .modal-content-ip {
+            position: absolute;
+            top: 0; right: 0;
+            width: 400px; height: 100vh;
+            background: #fff;
+            padding: 32px 24px;
+            border-radius: 10px 0 0 10px;
+            box-shadow: -2px 0 16px #0002;
+            overflow-y: auto;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: transform 0.5s cubic-bezier(.4,0,.2,1), opacity 0.4s cubic-bezier(.4,0,.2,1);
+        }
+        .modal-ip-edit.show .modal-content-ip.active {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .modal-content-ip.closing {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        .modal-content-ip h3 {
+            margin-top: 0;
+            color: #2d3e50;
+        }
+        .modal-content-ip form {
+            margin: 0;
+        }
+        .modal-content-ip label {
+            font-weight: 500;
+            color: #2d3e50;
+            margin-top: 8px;
+            margin-bottom: 2px;
+            display: block;
+        }
+        .modal-content-ip input[type="text"] {
+            width: 100%;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            box-sizing: border-box;
+            display: block;
+        }
+        .modal-content-ip input[type="text"]:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        .modal-content-ip .modal-actions {
+            text-align: right;
+            margin-top: 16px;
+        }
+        .modal-content-ip .modal-actions button {
+            margin-left: 8px;
+            padding: 8px 24px;
+            border-radius: 4px;
+            border: none;
+            font-size: 15px;
+            cursor: pointer;
+            background: #007bff;
+            color: #fff;
+            transition: background 0.2s;
+        }
+        .modal-content-ip .modal-actions button:hover {
+            background: #0056b3;
+        }
+        .modal-content-ip .modal-actions button[style*="background:#6c757d"] {
+            background: #6c757d;
+        }
+        .modal-content-ip .modal-actions button[style*="background:#6c757d"]:hover {
+            background: #495057;
+        }
+        #importIpRangeBtn[disabled] {
+            background: #e0e0e0 !important;
+            color: #aaa !important;
+            cursor: not-allowed !important;
+            border: none;
+        }
+        #importIpRangeBtn[disabled]:hover {
+            cursor: not-allowed !important;
+        }
+        .ip-action-btn {
+            background: none !important;
+            border: none !important;
+            color: #007bff !important;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 2px 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s;
+            vertical-align: middle;
+        }
+        .ip-action-btn .icon {
+            width: 18px;
+            height: 18px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 2px;
+            color: #007bff;
+        }
+        .ip-action-btn.delete {
+            color: #d9534f !important;
+        }
+        .ip-action-btn.delete .icon {
+            color: #d9534f !important;
+            fill: #d9534f !important;
+        }
+        .table-scroll-x {
+            overflow-x: auto;
+            width: 100%;
+            position: relative;
+            margin-bottom: 0;
+        }
+        .table-scroll-y {
+            max-height: 420px;
+            overflow-y: auto;
+            width: 100%;
+            position: relative;
+        }
+        table.ip-segment-table {
+            min-width: 800px;
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+        }
+        table.ip-segment-table th, table.ip-segment-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+            background: #fff;
+        }
+        table.ip-segment-table th {
+            background: #f4f6fa;
+            color: #2d3e50;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        table.ip-segment-table th:last-child,
+        table.ip-segment-table td.ip-table-action-cell {
+            position: sticky;
+            right: 0;
+            z-index: 11;
+            border-left: none !important;
+            box-shadow: none;
+            background: linear-gradient(to right, #007bff 0px, #fff 3px, #fff 6px);
+            text-align: center;
+        }
+        table.ip-segment-table th:last-child {
+            background: linear-gradient(to right, #007bff 0px, #fff 3px, #fff 6px);
+            z-index: 12;
+            border-left: none !important;
+            box-shadow: none;
+            text-align: center;
+        }
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .pagination-bar .page-btn {
+            min-width: 32px;
+            padding: 2px 8px;
+            border: 1px solid #e0e0e0;
+            background: #fff;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-bar .page-btn.active {
+            background: #007bff;
+            color: #fff;
+            font-weight: bold;
+            border-color: #007bff;
+        }
+        .pagination-bar .page-btn:disabled {
+            color: #aaa;
+            background: #f4f6fa;
+            cursor: not-allowed;
+        }
+        .pagination-bar .jump-input {
+            width: 48px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            margin-left: 8px;
+        }
+        .pagination-bar .jump-btn {
+            padding: 2px 10px;
+            border-radius: 4px;
+            border: none;
+            background: #007bff;
+            color: #fff;
+            margin-left: 2px;
+            cursor: pointer;
+        }
+        @media (max-width: 1200px) {
+            .container { padding: 12px; min-width: 800px; }
+            table.ip-segment-table { min-width: 800px; }
+        }
+        @media (max-width: 900px) {
+            .container { padding: 4px; min-width: 800px; }
+            table.ip-segment-table { min-width: 800px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IP段管理</h1>
+        <!-- 统计方格 -->
+        <div style="display:flex;gap:24px;margin-bottom:32px;">
+            <div class="stat-card">
+                <div id="ipRangeCount">0</div>
+                <div>IP段数量</div>
+            </div>
+            <div class="stat-card">
+                <div id="ipAddrCount">0</div>
+                <div>IP地址数量</div>
+            </div>
+            <div class="stat-card">
+                <div id="ipAssignedCount">0</div>
+                <div>已分配数量</div>
+            </div>
+            <div class="stat-card">
+                <div id="ipAvailableCount">0</div>
+                <div>可用数量</div>
+            </div>
+        </div>
+        <!-- 查询表单 -->
+        <form id="ipRangeSearchForm" style="margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap;">
+            <input type="text" name="segment" placeholder="IP段">
+            <input type="text" name="business" placeholder="使用业务">
+            <input type="text" name="department" placeholder="使用部门">
+            <input type="text" name="vlan" placeholder="VLAN ID">
+            <button type="submit">查询</button>
+        </form>
+        <!-- 列表操作按钮 -->
+        <div style="margin-bottom:12px;">
+            <button id="addIpRangeBtn">新增</button>
+            <button id="importIpRangeBtn" disabled style="background:#e0e0e0;color:#aaa;cursor:not-allowed;">导入</button>
+        </div>
+        <!-- 新增弹窗 -->
+        <div id="addModal">
+            <div class="modal-content">
+                <h3>新增IP段</h3>
+                <form id="addIpRangeForm">
+                    <label>IP段 <span style="color:red">*</span></label>
+                    <input type="text" name="segment" required placeholder="格式：192.168.0">
+                    <label>IP掩码 <span style="color:red">*</span></label>
+                    <select name="mask" id="maskSelect" required></select>
+                    <label>使用业务</label>
+                    <input type="text" name="business">
+                    <label>使用部门</label>
+                    <input type="text" name="department">
+                    <label>未使用IP情况</label>
+                    <input type="text" name="unused">
+                    <label>VLAN ID</label>
+                    <input type="text" name="vlan">
+                    <label>网段标识</label>
+                    <input type="text" name="tag">
+                    <label>备注</label>
+                    <input type="text" name="remark">
+                    <div class="modal-actions">
+                        <button type="button" id="cancelAddBtn" style="background:#6c757d;">取消</button>
+                        <button type="submit">提交</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 页面弹窗 -->
+        <div id="deleteModal">
+            <div class="modal-content" style="max-width:320px;text-align:center;">
+                <div style="font-size:18px;margin-bottom:24px;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <span style="font-size:24px;color:#ffc107;">&#9888;</span>
+                    <span style="color:#d9534f;">确定要删除该IP段吗？</span>
+                </div>
+                <div class="modal-actions" style="text-align:center;display:flex;justify-content:center;gap:16px;margin-top:16px;">
+                    <button id="cancelDeleteBtn" style="background:#6c757d;">取消</button>
+                    <button id="confirmDeleteBtn" class="danger-btn">删除</button>
+                </div>
+            </div>
+        </div>
+        <!-- 编辑弹窗 -->
+        <div id="editModal">
+            <div class="modal-content">
+                <h3>编辑IP段</h3>
+                <form id="editIpRangeForm">
+                    <input type="hidden" name="id">
+                    <label>IP段</label>
+                    <input type="text" name="segment" readonly>
+                    <label>IP掩码</label>
+                    <input type="text" name="mask" readonly>
+                    <label>使用业务</label>
+                    <input type="text" name="business">
+                    <label>使用部门</label>
+                    <input type="text" name="department">
+                    <label>未使用IP情况</label>
+                    <input type="text" name="unused">
+                    <label>VLAN ID</label>
+                    <input type="text" name="vlan">
+                    <label>网段标识</label>
+                    <input type="text" name="tag">
+                    <label>备注</label>
+                    <input type="text" name="remark">
+                    <div class="modal-actions">
+                        <button type="button" id="cancelEditBtn" style="background:#6c757d;">取消</button>
+                        <button type="submit">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- IP段详情弹窗 -->
+        <div id="segmentDetailModal" class="segment-detail-modal">
+            <div class="segment-detail-content">
+                <div class="segment-detail-header">
+                    <span class="segment-detail-title" id="segmentDetailTitle"></span>
+                    <div class="segment-detail-actions">
+                        <button class="fullscreen-btn" id="segmentDetailFullscreenBtn" title="全屏">⛶</button>
+                        <button class="close-btn" id="segmentDetailCloseBtn" title="关闭">✖</button>
+                    </div>
+                </div>
+                <div id="segmentDetailStatus"></div>
+                <div id="segmentIpGrid" class="segment-ip-grid"></div>
+                <div class="segment-detail-footer">
+                    <button id="segmentDetailFooterCloseBtn">关闭</button>
+                </div>
+            </div>
+        </div>
+        <!-- IP格子悬浮提示 -->
+        <div id="ipTooltip" class="ip-tooltip"></div>
+        <!-- IP段列表 -->
+        <div class="table-scroll-x">
+            <div class="table-scroll-y" id="ipSegmentTableScrollY">
+                <table class="ip-segment-table" id="ipSegmentTable">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>IP段</th>
+                            <th>使用业务</th>
+                            <th>使用部门</th>
+                            <th>未使用IP情况</th>
+                            <th>IP掩码</th>
+                            <th>VLAN ID</th>
+                            <th>网段标识</th>
+                            <th>备注</th>
+                            <th style="min-width:180px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ipRangeTableBody">
+                        <!-- 数据行由JS渲染 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- 分页控件 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;">
+            <div>
+                每页
+                <select id="pageSizeSelect" style="padding:4px 12px;">
+                    <option value="10">10行</option>
+                    <option value="20">20行</option>
+                    <option value="50">50行</option>
+                </select>
+            </div>
+            <div id="paginationBar" class="pagination-bar"></div>
+        </div>
+        <!-- 编辑IP地址弹窗（确保在body末尾） -->
+        <div id="editIpModal" class="modal-ip-edit">
+            <div class="modal-content-ip">
+                <h3>编辑IP地址</h3>
+                <form id="editIpForm">
+                    <input type="hidden" name="id">
+                    <label>IP地址</label>
+                    <input type="text" name="ip" readonly>
+                    <label>MAC地址</label>
+                    <input type="text" name="mac">
+                    <label>主机名</label>
+                    <input type="text" name="hostname">
+                    <label>使用业务</label>
+                    <input type="text" name="business">
+                    <label>使用部门</label>
+                    <input type="text" name="department">
+                    <label>使用人</label>
+                    <input type="text" name="user">
+                    <label>资产编号</label>
+                    <input type="text" name="asset_number" id="assetNumberInput">
+                    <label>手动标记</label>
+                    <select name="manual">
+                        <option value="">无</option>
+                        <option value="已分配">已分配</option>
+                        <option value="使用中">使用中</option>
+                        <option value="未使用">未使用</option>
+                        <option value="不可用">不可用</option>
+                        <option value="未知">未知</option>
+                    </select>
+                    <label>备注</label>
+                    <input type="text" name="remark">
+                    <div class="modal-actions">
+                        <button type="button" id="cancelEditIpBtn" style="background:#6c757d;">取消</button>
+                        <button type="submit">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 新增成功弹窗 -->
+        <div id="successModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:2000;">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:40px 60px;border-radius:12px;box-shadow:0 2px 16px #0002;text-align:center;">
+                <div style="font-size:22px;color:#43ea7c;margin-bottom:18px;">新增成功</div>
+                <button id="successModalCloseBtn" style="padding:8px 32px;border-radius:6px;background:#007bff;color:#fff;border:none;font-size:16px;cursor:pointer;">确定</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 页面加载时从后端获取数据
+        let ipRangeList = [];
+        let ipAddrList = [];
+
+        function fetchIpAddrsForStats() {
+            return fetch('/ip-addresses')
+                .then(res => res.json())
+                .then(data => {
+                    ipAddrList = Array.isArray(data) ? data : [];
+                    // 查找手动标记的IP
+                    const manualIps = ipAddrList.filter(ip => ip.manual !== null && ip.manual !== undefined && ip.manual !== '');
+                })
+                .catch(() => {
+                    ipAddrList = [];
+                });
+        }
+
+        function renderIpRangeStats() {
+            const totalSegments = ipRangeList.length;
+            const totalIps = ipAddrList.length;
+            let assigned = 0;
+            let available = 0;
+
+            ipAddrList.forEach(item => {
+                // 修复：正确处理 manual 字段的 null 值 
+                if ((item.manual !== null && item.manual !== undefined && item.manual !== '') || (item.status && item.status.includes('分配'))) {
+                    assigned++;
+                } else {
+                    available++;
+                }
+            });
+
+            document.getElementById('ipRangeCount').innerText = totalSegments;
+            document.getElementById('ipAddrCount').innerText = totalIps;
+            document.getElementById('ipAssignedCount').innerText = assigned;
+            document.getElementById('ipAvailableCount').innerText = available;
+        }
+
+        function fetchIpRanges() {
+            fetch('/ip-segments')
+                .then(res => res.json())
+                .then(data => {
+                    ipRangeList = Array.isArray(data) ? data : [];
+                    // 先获取IP地址数据再渲染统计卡片
+                    fetchIpAddrsForStats().then(() => {
+                        renderIpRangeStats();
+                        renderIpRangeTable(ipRangeList);
+                    });
+                })
+                .catch(() => {
+                    ipRangeList = [];
+                    ipAddrList = [];
+                    renderIpRangeStats();
+                    renderIpRangeTable(ipRangeList);
+                });
+        }
+
+        // 删除弹窗相关变量
+        let pendingDeleteId = null;
+
+        function showDeleteModal(id) {
+            pendingDeleteId = id;
+            const modal = document.getElementById('deleteModal');
+            const content = modal.querySelector('.modal-content');
+            modal.classList.add('show');
+            // 居中动画
+            setTimeout(() => {
+                content.classList.add('active');
+            }, 10);
+        }
+
+        function hideDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            const content = modal.querySelector('.modal-content');
+            content.classList.remove('active');
+            setTimeout(() => {
+                modal.classList.remove('show');
+            }, 400);
+            pendingDeleteId = null;
+        }
+
+        document.getElementById('cancelDeleteBtn').onclick = hideDeleteModal;
+        document.getElementById('deleteModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) hideDeleteModal();
+        });
+        document.getElementById('confirmDeleteBtn').onclick = function() {
+            if (!pendingDeleteId) return;
+            fetch('/ip-segments/' + pendingDeleteId, { method: 'DELETE' })
+                .then(res => res.json())
+                .then(result => {
+                    hideDeleteModal();
+                    pendingDeleteId = null;
+                    if (result.success) {
+                        fetchIpRanges();
+                    } else {
+                        alert(result.message || '删除失败');
+                    }
+                })
+                .catch(() => {
+                    hideDeleteModal();
+                    pendingDeleteId = null;
+                    alert('网络错误，删除失败');
+                });
+        };
+
+        // 替换原气泡弹窗为居中弹窗
+        window.showDeletePopover = function(btn, id) {
+            showDeleteModal(id);
+        };
+
+        // 编辑IP弹窗显示/隐藏
+        // 当前弹窗所属IP段ID
+        let currentSegmentId = null;
+
+        function showEditIpModal(ipObj) {
+            const modal = document.getElementById('editIpModal');
+            const content = modal.querySelector('.modal-content-ip');
+            const form = document.getElementById('editIpForm');
+            form.id.value = ipObj.id || '';
+            form.ip.value = ipObj.ip || '';
+            form.mac.value = ipObj.mac || '';
+            form.hostname.value = ipObj.hostname || '';
+            form.business.value = ipObj.business || '';
+            form.department.value = ipObj.department || '';
+            form.user.value = ipObj.user || '';
+            form.manual.value = ipObj.manual || '';
+            form.remark.value = ipObj.remark || '';
+            form.asset_number.value = ipObj.asset_number || '';
+            // 记录当前IP段ID（用于刷新详情）
+            currentSegmentId = ipObj.segment_id || ipObj.segmentId || null;
+            content.classList.remove('closing');
+            modal.classList.add('show');
+            setTimeout(() => {
+                content.classList.add('active');
+            }, 10);
+        }
+        function hideEditIpModal() {
+            const modal = document.getElementById('editIpModal');
+            const content = modal.querySelector('.modal-content-ip');
+            content.classList.remove('active');
+            content.classList.add('closing');
+            setTimeout(() => {
+                modal.classList.remove('show');
+                content.classList.remove('closing');
+            }, 500);
+        }
+        document.getElementById('cancelEditIpBtn').onclick = hideEditIpModal;
+        document.getElementById('editIpModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) hideEditIpModal();
+        });
+
+
+
+        function renderIpRangeTable(list) {
+            filteredList = list;
+            currentPage = 1;
+            renderIpRangeTablePage();
+        }
+
+        // 渲染IP段表格（带分页）
+        let currentPage = 1;
+        let pageSize = 10;
+        let filteredList = [];
+
+        function renderIpRangeTablePage() {
+            const total = filteredList.length;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            currentPage = Math.min(currentPage, totalPages);
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, total);
+            const pageData = filteredList.slice(startIdx, endIdx);
+
+            const tbody = document.getElementById('ipRangeTableBody');
+            tbody.innerHTML = '';
+            pageData.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${startIdx + idx + 1}</td>
+                    <td>${item.segment}</td>
+                    <td>${item.business}</td>
+                    <td>${item.department}</td>
+                    <td>${item.unused}</td>
+                    <td>${item.mask}</td>
+                    <td>${item.vlan}</td>
+                    <td>${item.tag}</td>
+                    <td>${item.remark}</td>
+                    <td class="ip-table-action-cell" style="white-space:nowrap;">
+                        <button class="ip-action-btn" onclick="scanIp(${item.id})">
+                            <span class="icon">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <circle cx="9" cy="9" r="7" stroke="#007bff" stroke-width="2"/>
+                                    <line x1="15" y1="15" x2="19" y2="19" stroke="#007bff" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        <span>扫描IP</span>
+                    </button>
+                    <button class="ip-action-btn" onclick="showIpRange(${item.id})">
+                        <span class="icon">
+                            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                <ellipse cx="10" cy="10" rx="7" ry="5" stroke="#007bff" stroke-width="2"/>
+                                <circle cx="10" cy="10" r="2" stroke="#007bff" stroke-width="2"/>
+                            </svg>
+                        </span>
+                        <span>显示</span>
+                    </button>
+                    <button class="ip-action-btn" onclick="editIpRange(${item.id})">
+                        <span class="icon">
+                            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                <path d="M4 13.5V16h2.5l9-9-2.5-2.5-9 9z" stroke="#007bff" stroke-width="2" fill="none"/>
+                                <path d="M13.5 6.5l2 2" stroke="#007bff" stroke-width="2" fill="none"/>
+                            </svg>
+                        </span>
+                        <span>编辑</span>
+                    </button>
+                    <button class="ip-action-btn delete" onclick="showDeletePopover(this,${item.id})">
+                        <span class="icon">
+                            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                <rect x="5" y="7" width="10" height="8" rx="2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                <path d="M7 7V5a3 3 0 0 1 6 0v2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                <line x1="8" y1="10" x2="8" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="12" y1="10" x2="12" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </span>
+                        <span>删除</span>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        renderPaginationBar(totalPages);
+
+        // 控制纵向滚动条
+        const scrollY = document.getElementById('ipSegmentTableScrollY');
+        if (pageData.length > 10) {
+            scrollY.style.maxHeight = '420px';
+            scrollY.style.overflowY = 'auto';
+        } else {
+            scrollY.style.maxHeight = '';
+            scrollY.style.overflowY = '';
+        }
+    }
+
+    function renderPaginationBar(totalPages) {
+        const bar = document.getElementById('paginationBar');
+        const total = filteredList.length;
+        if (totalPages <= 1) {
+            bar.innerHTML = `共 ${total} 条数据`;
+            return;
+        }
+        let html = `共 ${total} 条数据 `;
+        // 首页/上一页
+        html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoPage(1)">首页</button>`;
+        html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoPage(${currentPage - 1})">上一页</button>`;
+
+        // 页码区块
+        let pageBtns = [];
+        let maxShow = 7;
+        if (totalPages <= maxShow) {
+            for (let i = 1; i <= totalPages; i++) {
+                pageBtns.push(i);
+            }
+        } else {
+            if (currentPage <= 4) {
+                pageBtns = [1,2,3,4,5,'...',totalPages];
+            } else if (currentPage >= totalPages - 3) {
+                pageBtns = [1,'...',totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages];
+            } else {
+                pageBtns = [1,'...',currentPage-1,currentPage,currentPage+1,'...',totalPages];
+            }
+        }
+        pageBtns.forEach(p => {
+            if (p === '...') {
+                html += `<span style="padding:0 4px;">...</span>`;
+            } else {
+                html += `<button class="page-btn${p===currentPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`;
+            }
+        });
+
+        // 下一页/末页
+        html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoPage(${currentPage + 1})">下一页</button>`;
+        html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoPage(${totalPages})">末页</button>`;
+
+        // 跳转输入框
+        html += `<span style="margin-left:8px;">跳至</span>
+            <input type="number" min="1" max="${totalPages}" id="jumpPageInput" class="jump-input" value="${currentPage}">
+            <button class="jump-btn" onclick="jumpToPage(${totalPages})">确定</button>`;
+
+        bar.innerHTML = html;
+
+        // 绑定跳转事件
+        document.getElementById('jumpPageInput').onkeydown = function(e) {
+            if (e.key === 'Enter') {
+                jumpToPage(totalPages);
+            }
+        };
+    }
+
+    window.gotoPage = function(page) {
+        page = Math.max(1, Math.min(page, Math.ceil(filteredList.length / pageSize)));
+        currentPage = page;
+        renderIpRangeTablePage();
+    };
+
+    window.jumpToPage = function(totalPages) {
+        const input = document.getElementById('jumpPageInput');
+        let val = parseInt(input.value, 10);
+        if (!val || val < 1 || val > totalPages) return;
+        gotoPage(val);
+    };
+
+    document.getElementById('pageSizeSelect').onchange = function() {
+        pageSize = parseInt(this.value, 10);
+        currentPage = 1;
+        renderIpRangeTablePage();
+    };
+
+    // 搜索表单
+    document.getElementById('ipRangeSearchForm').onsubmit = function(e) {
+        e.preventDefault();
+        const fd = new FormData(this);
+        let filtered = ipRangeList.filter(item => {
+            return (!fd.get('segment') || item.segment.includes(fd.get('segment')))
+                && (!fd.get('business') || item.business.includes(fd.get('business')))
+                && (!fd.get('department') || item.department.includes(fd.get('department')))
+                && (!fd.get('vlan') || item.vlan.includes(fd.get('vlan')));
+        });
+        renderIpRangeTable(filtered);
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // 新增弹窗逻辑
+        document.getElementById('addIpRangeBtn').onclick = function() {
+            fillMaskSelect();
+            // 重置表单内容
+            const form = document.getElementById('addIpRangeForm');
+            form.reset();
+            // 先移除动画类，确保每次都能触发动画
+            const modal = document.getElementById('addModal');
+            const content = modal.querySelector('.modal-content');
+            content.classList.remove('active');
+            modal.classList.add('show');
+            setTimeout(() => {
+                content.classList.add('active');
+            }, 10);
+        };
+        document.getElementById('cancelAddBtn').onclick = function() {
+            hideModal('addModal');
+        };
+
+        // 新增成功弹窗关闭
+        document.getElementById('successModalCloseBtn').onclick = function() {
+            document.getElementById('successModal').style.display = 'none';
+        };
+
+        // 编辑弹窗逻辑
+        document.getElementById('cancelEditBtn').onclick = function() {
+            hideModal('editModal');
+        };
+        document.getElementById('editIpRangeForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            fetch('/ip-segments/' + fd.get('id'), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    business: fd.get('business'),
+                    department: fd.get('department'),
+                    unused: fd.get('unused'),
+                    vlan: fd.get('vlan'),
+                    tag: fd.get('tag'),
+                    remark: fd.get('remark')
+                })
+            })
+            .then(res => {
+                return res.json().catch(err => {
+                    return res.text().then(txt => {
+                        console.error('保存失败，接口返回非JSON:', txt);
+                        throw new Error('接口返回非JSON');
+                    });
+                });
+            })
+            .then(result => {
+                if (result.success) {
+                    alert('保存成功');
+                    hideModal('editModal');
+                    fetchIpRanges();
+                } else {
+                    alert('保存失败');
+                    console.error('保存失败:', result);
+                }
+            })
+            .catch(err => {
+                alert('网络错误，保存失败');
+                console.error('网络错误:', err);
+            });
+        };
+
+        // 遮罩点击关闭弹窗（只绑定一次）
+        ['addModal', 'deleteModal', 'editModal'].forEach(function(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.addEventListener('mousedown', function(e) {
+                if (e.target === modal) {
+                    hideModal(modalId);
+                }
+            });
+        });
+
+        fetchIpRanges();
+    });
+
+    // 全局弹窗显示/隐藏函数
+    function showModal(modalId) {
+        const modal = document.getElementById(modalId);
+        const content = modal.querySelector('.modal-content');
+        modal.classList.add('show');
+        // 让浏览器渲染后再加动画类
+        requestAnimationFrame(() => {
+            content.classList.add('active');
+        });
+    }
+    function hideModal(modalId) {
+        const modal = document.getElementById(modalId);
+        const content = modal.querySelector('.modal-content');
+        content.classList.remove('active');
+        // 动画结束后再隐藏父容器
+        setTimeout(() => {
+            modal.classList.remove('show');
+        }, 700);
+    }
+
+    // 点击遮罩关闭弹窗
+    ['addModal', 'deleteModal', 'editModal'].forEach(function(modalId) {
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById(modalId);
+            modal.addEventListener('mousedown', function(e) {
+                // 只在点击遮罩区域时关闭弹窗
+                if (e.target === modal) {
+                    hideModal(modalId);
+                }
+            });
+        });
+    });
+
+    window.scanIp = function(id) { alert('扫描IP段ID: ' + id); };
+
+    // 修正显示按钮绑定为弹窗
+    window.showIpRange = function(id) {
+        // 获取IP段数据
+        const segmentObj = ipRangeList.find(item => item.id == id);
+        if (!segmentObj) return;
+        
+        console.log('显示IP段详情:', segmentObj.segment);
+        
+        // 重新获取最新的IP地址数据
+        fetch('/ip-addresses')
+            .then(res => res.json())
+            .then(data => {
+                ipAddrList = Array.isArray(data) ? data : [];
+                console.log('获取到数据:', ipAddrList.length, '条');
+                
+                // 继续执行原有的显示逻辑
+                showIpRangeDetails(segmentObj);
+            })
+            .catch(err => {
+                console.error('获取IP地址数据失败:', err);
+                ipAddrList = [];
+                showIpRangeDetails(segmentObj);
+            });
+    };
+    
+    function showIpRangeDetails(segmentObj) {
+        
+        // 标题
+        document.getElementById('segmentDetailTitle').innerText = `IP段详情：${segmentObj.segment}${segmentObj.mask ? '/' + segmentObj.mask : ''}`;
+        // 状态标签
+        let statusHtml = '';
+        // 状态标记：使用中、未使用、手动标记
+        statusHtml += `<span class="segment-status-label status-used">使用中</span>`;
+        statusHtml += `<span class="segment-status-label status-unused">未使用</span>`;
+        statusHtml += `<span class="segment-status-label status-manual">手动标记</span>`;
+        document.getElementById('segmentDetailStatus').innerHTML = statusHtml;
+
+        // 计算IP范围
+        let ipGridHtml = '';
+        let baseIp = segmentObj.segment;
+        let mask = parseInt(segmentObj.mask);
+        let count = 0;
+        if (baseIp && mask >= 8 && mask <= 30) {
+            // 只支持A/B/C段
+            let ipParts = baseIp.split('.');
+            if (ipParts.length === 3) {
+                // 只支持如192.168.1
+                count = Math.pow(2, 32 - mask) - 2;
+                console.log(`IP段 ${baseIp} 将生成 ${count} 个IP地址`);
+                
+                for (let i = 1; i <= count; i++) {
+                    let ip = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}.${i}`;
+                    // 查找IP地址状态 - 优先选择有manual标记的记录
+                    let ipObjs = ipAddrList.filter(addr => addr.ip === ip);
+                    let ipObj = null;
+                    
+                    if (ipObjs.length > 0) {
+                        // 如果有多个记录，优先选择有manual标记的
+                        ipObj = ipObjs.find(obj => obj.manual !== null && obj.manual !== undefined && obj.manual !== '') || ipObjs[0];
+                    }
+                    
+                    let cellClass = 'unused';
+                    let hostname = '';
+                    let user = '';
+                    if (ipObj) {
+                        hostname = ipObj.hostname || '';
+                        user = ipObj.user || '';
+                        
+                        // 判断IP状态
+                        if (ipObj.manual !== null && ipObj.manual !== undefined && ipObj.manual !== '') {
+                            cellClass = 'manual';
+                        } else if (ipObj.status && ipObj.status.includes('分配')) {
+                            cellClass = 'used';
+                        }
+                    }
+                    // 增加 data-ip、data-hostname、data-user 属性
+                    ipGridHtml += `<div class="segment-ip-cell ${cellClass}" data-ip="${ip}" data-hostname="${hostname}" data-user="${user}" data-idx="${i}">${i}</div>`;
+                }
+            }
+        }
+        document.getElementById('segmentIpGrid').innerHTML = ipGridHtml;
+
+        // 绑定鼠标悬停和点击事件
+        const grid = document.getElementById('segmentIpGrid');
+        grid.querySelectorAll('.segment-ip-cell').forEach(cell => {
+            cell.onmouseenter = function(e) {
+                const hostname = cell.getAttribute('data-hostname');
+                const user = cell.getAttribute('data-user');
+                let tip = '';
+                if (hostname && hostname !== '') {
+                    tip += '主机名: ' + hostname;
+                } else {
+                    tip += '主机名: 未知';
+                }
+                tip += '\n';
+                if (user && user !== '') {
+                    tip += '使用人: ' + user;
+                } else {
+                    tip += '使用人: 未知';
+                }
+                showIpTooltip(tip, e);
+            };
+            cell.onmousemove = function(e) {
+                const hostname = cell.getAttribute('data-hostname');
+                const user = cell.getAttribute('data-user');
+                let tip = '';
+                if (hostname && hostname !== '') {
+                    tip += '主机名: ' + hostname;
+                } else {
+                    tip += '主机名: 未知';
+                }
+                tip += '\n';
+                if (user && user !== '') {
+                    tip += '使用人: ' + user;
+                } else {
+                    tip += '使用人: 未知';
+                }
+                showIpTooltip(tip, e);
+            };
+            cell.onmouseleave = function() {
+                hideIpTooltip();
+            };
+            cell.onclick = function() {
+                const ip = cell.getAttribute('data-ip');
+                // 优先选择有manual标记的记录
+                let ipObjs = ipAddrList.filter(addr => addr.ip === ip);
+                let ipObj = null;
+                
+                if (ipObjs.length > 0) {
+                    // 如果有多个记录，优先选择有manual标记的
+                    ipObj = ipObjs.find(obj => obj.manual !== null && obj.manual !== undefined && obj.manual !== '') || ipObjs[0];
+                } else {
+                    ipObj = {ip};
+                }
+                
+                // 传递 segmentId
+                ipObj.segment_id = segmentObj.id;
+                showEditIpModal(ipObj);
+            };
+        });
+
+        // 动画处理
+        const modal = document.getElementById('segmentDetailModal');
+        const content = modal.querySelector('.segment-detail-content');
+        content.classList.add('animating');
+        modal.classList.add('show');
+        modal.classList.remove('fullscreen');
+        // 触发展开动画
+        setTimeout(() => {
+            content.classList.remove('animating');
+        }, 10); // 10ms后移除，触发transition到正常状态
+    };
+
+    // 修正新增按钮绑定弹窗逻辑，始终显示弹窗并重置动画
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('addIpRangeBtn').onclick = function() {
+            fillMaskSelect();
+            // 重置表单内容
+            const form = document.getElementById('addIpRangeForm');
+            form.reset();
+            // 先移除动画类，确保每次都能触发动画
+            const modal = document.getElementById('addModal');
+            const content = modal.querySelector('.modal-content');
+            content.classList.remove('active');
+            modal.classList.add('show');
+            setTimeout(() => {
+                content.classList.add('active');
+            }, 10);
+        };
+        document.getElementById('cancelAddBtn').onclick = function() {
+            hideModal('addModal');
+        };
+    });
+
+    // 修正编辑按钮弹窗逻辑
+    window.editIpRange = function(id) {
+        const ipRange = ipRangeList.find(item => item.id == id);
+        if (!ipRange) return;
+        const editForm = document.getElementById('editIpRangeForm');
+        editForm.id.value = ipRange.id;
+        editForm.segment.value = ipRange.segment;
+        editForm.mask.value = ipRange.mask;
+        editForm.business.value = ipRange.business || '';
+        editForm.department.value = ipRange.department || '';
+        editForm.unused.value = ipRange.unused || '';
+        editForm.vlan.value = ipRange.vlan || '';
+        editForm.tag.value = ipRange.tag || '';
+        editForm.remark.value = ipRange.remark || '';
+        showModal('editModal');
+    };
+
+    // 动态生成所有掩码选项，并在页面渲染后设置默认值为24
+    function fillMaskSelect() {
+        const maskSelect = document.getElementById('maskSelect');
+        maskSelect.innerHTML = '';
+        let defaultValue = 24;
+        for (let i = 8; i <= 30; i++) {
+            const mask = (0xFFFFFFFF << (32 - i)) >>> 0;
+            const ipMask = [
+                (mask >>> 24) & 0xFF,
+                (mask >>> 16) & 0xFF,
+                (mask >>> 8) & 0xFF,
+                mask & 0xFF
+            ].join('.');
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = `${ipMask} (${i})`;
+            maskSelect.appendChild(opt);
+        }
+        // 等待下一个事件循环再设置默认值，确保option已渲染
+        setTimeout(() => {
+            maskSelect.value = defaultValue.toString();
+            //console.log('maskSelect.value after setTimeout:', maskSelect.value);
+        }, 0);
+    }
+
+    // 新增弹窗逻辑
+    const addModal = document.getElementById('addModal');
+    document.getElementById('addIpRangeBtn').onclick = function() {
+        fillMaskSelect();
+        addModal.style.display = '';
+    };
+    document.getElementById('cancelAddBtn').onclick = function() {
+        addModal.style.display = 'none';
+    };
+
+    document.getElementById('addIpRangeForm').onsubmit = function(e) {
+        e.preventDefault();
+        const fd = new FormData(this);
+        const segment = fd.get('segment');
+        const mask = fd.get('mask');
+        // 校验IP段格式
+        if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(segment)) {
+            alert('IP段格式错误，应为如 192.168.0');
+            return;
+        }
+        if (!mask) {
+            alert('请选择IP掩码');
+            return;
+        }
+        
+        // 检查是否已存在相同的IP段（无论掩码是否相同）
+        const existingSegment = ipRangeList.find(item => item.segment === segment);
+        if (existingSegment) {
+            if (existingSegment.mask == mask) {
+                alert(`IP段 ${segment}/${mask} 已存在，不能重复添加`);
+            } else {
+                alert(`IP段 ${segment} 已存在（掩码为 /${existingSegment.mask}），请先删除已存在的IP段才能添加相同IP段的不同掩码`);
+            }
+            return;
+        }
+        
+        fetch('/ip-segments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                segment: segment,
+                mask: mask,
+                business: fd.get('business'),
+                department: fd.get('department'),
+                unused: fd.get('unused'),
+                vlan: fd.get('vlan'),
+                tag: fd.get('tag'),
+                remark: fd.get('remark')
+            })
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.text().then(txt => {
+                    console.error('接口错误:', txt);
+                    throw new Error('接口错误: ' + res.status);
+                });
+            }
+            return res.json();
+        })
+        .then(result => {
+            if (result.success) {
+                // 页面弹窗提示
+                document.getElementById('addModal').classList.remove('show');
+                document.getElementById('successModal').style.display = 'block';
+                fetchIpRanges(); // 新增后重新加载数据
+            } else {
+                alert(result.message || '新增失败');
+            }
+        })
+        .catch(err => {
+            alert('网络错误，新增失败');
+            console.error('网络错误:', err);
+        });
+    };
+
+    // IP格子悬浮提示逻辑
+    const ipTooltip = document.getElementById('ipTooltip');
+    function showIpTooltip(text, evt) {
+        ipTooltip.innerText = text;
+        ipTooltip.classList.add('show');
+        // 定位到鼠标附近
+        const x = evt.clientX + 12;
+        const y = evt.clientY + 12;
+        ipTooltip.style.left = x + 'px';
+        ipTooltip.style.top = y + 'px';
+        // 支持多行
+        ipTooltip.style.whiteSpace = 'pre-line';
+    }
+    function hideIpTooltip() {
+        ipTooltip.classList.remove('show');
+    }
+
+    // 获取资产编号列表并渲染到下拉框
+    let assetNumberList = [];
+    function fetchAssetNumbers(selectedValue) {
+        return fetch('/asset-numbers')
+            .then(res => res.json())
+            .then(list => {
+                assetNumberList = Array.isArray(list) ? list : [];
+                const select = document.getElementById('assetNumberSelect');
+                select.innerHTML = '<option value="">未绑定</option>';
+                assetNumberList.forEach(item => {
+                    select.innerHTML += `<option value="${item.asset_number}">${item.asset_number}</option>`;
+                });
+                if (selectedValue) select.value = selectedValue;
+            });
+    }
+
+    document.getElementById('editIpForm').onsubmit = function(e) {
+        e.preventDefault();
+        const fd = new FormData(this);
+        fetch('/ip-addresses/' + fd.get('id'), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mac: fd.get('mac'),
+                hostname: fd.get('hostname'),
+                business: fd.get('business'),
+                department: fd.get('department'),
+                user: fd.get('user'),
+                manual: fd.get('manual'),
+                remark: fd.get('remark'),
+                asset_number: fd.get('asset_number')
+            })
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                alert('保存成功');
+                hideEditIpModal();
+                fetchIpAddrsForStats().then(() => {
+                    renderIpRangeStats();
+                    // 自动刷新当前IP段详情
+                    if (currentSegmentId) {
+                        window.showIpRange(currentSegmentId);
+                    }
+                });
+            } else {
+                alert(result.message || '保存失败');
+            }
+        })
+        .catch(() => alert('网络错误，保存失败'));
+    };
+
+        // 关闭详情弹窗动画
+        function hideSegmentDetailModal() {
+            const modal = document.getElementById('segmentDetailModal');
+            const content = modal.querySelector('.segment-detail-content');
+            content.classList.add('closing');
+            setTimeout(() => {
+                modal.classList.remove('show');
+                modal.classList.remove('fullscreen');
+                content.classList.remove('closing');
+            }, 400); // 动画时长与CSS一致
+        }
+
+        // 全屏切换
+        document.getElementById('segmentDetailFullscreenBtn').onclick = function() {
+            const modal = document.getElementById('segmentDetailModal');
+            modal.classList.toggle('fullscreen');
+        };
+        document.getElementById('segmentDetailCloseBtn').onclick = hideSegmentDetailModal;
+        document.getElementById('segmentDetailFooterCloseBtn').onclick = hideSegmentDetailModal;
+
+        // 点击遮罩关闭弹窗
+        document.getElementById('segmentDetailModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) hideSegmentDetailModal();
+        });
+    </script>
+</body>
+</html>

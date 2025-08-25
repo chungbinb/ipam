@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>服务器概览</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 32px;
+            padding: 32px;
+            min-height: 90vh;
+        }
+        .overview-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px #0001;
+            padding: 24px 18px 18px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            min-height: 320px;
+        }
+        .overview-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2d3e50;
+            margin-bottom: 18px;
+        }
+        .chart-area {
+            flex: 1;
+            min-height: 220px;
+        }
+    </style>
+</head>
+<body>
+    <div class="overview-grid">
+        <!-- 左上角：操作系统柱状图 -->
+        <div class="overview-card">
+            <div class="overview-title">服务器操作系统统计</div>
+            <div id="osBarChart" class="chart-area"></div>
+        </div>
+        <!-- 右上角：漏洞状态统计 -->
+        <div class="overview-card">
+            <div class="overview-title">服务器漏洞状态统计</div>
+            <div id="vulnPieChart" class="chart-area"></div>
+        </div>
+        <!-- 左下角：服务器类型分布饼图 -->
+        <div class="overview-card">
+            <div class="overview-title">服务器类型分布</div>
+            <div id="typePieChart" class="chart-area"></div>
+        </div>
+        <!-- 右下角：服务器在线率仪表盘 -->
+        <div class="overview-card">
+            <div class="overview-title">服务器在线率</div>
+            <div id="onlineGaugeChart" class="chart-area"></div>
+        </div>
+    </div>
+    <script>
+        // 示例数据
+        const osData = [
+            { name: 'Windows Server', value: 18 },
+            { name: 'Linux', value: 32 },
+            { name: 'CentOS', value: 14 },
+            { name: 'Ubuntu', value: 9 },
+            { name: '其他', value: 5 }
+        ];
+        const vulnData = [
+            { name: '无漏洞', value: 48 },
+            { name: '低危', value: 12 },
+            { name: '中危', value: 8 },
+            { name: '高危', value: 4 }
+        ];
+        const typeData = [
+            { name: '物理机', value: 22 },
+            { name: '虚拟机', value: 28 },
+            { name: '云主机', value: 15 }
+        ];
+        const onlineRate = 0.92; // 92%
+
+        // 操作系统柱状图
+        const osBarChart = echarts.init(document.getElementById('osBarChart'));
+        osBarChart.setOption({
+            tooltip: { trigger: 'axis' },
+            xAxis: {
+                type: 'category',
+                data: osData.map(d => d.name),
+                axisLabel: { rotate: 20 }
+            },
+            yAxis: { type: 'value' },
+            series: [{
+                data: osData.map(d => d.value),
+                type: 'bar',
+                itemStyle: { color: '#007bff' }
+            }]
+        });
+
+        // 漏洞状态饼图
+        const vulnPieChart = echarts.init(document.getElementById('vulnPieChart'));
+        vulnPieChart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0 },
+            series: [{
+                type: 'pie',
+                radius: ['40%', '70%'],
+                label: { show: true, formatter: '{b}: {c}' },
+                data: vulnData,
+                color: ['#43ea7c', '#ffc107', '#ff9800', '#d9534f']
+            }]
+        });
+
+        // 类型分布饼图
+        const typePieChart = echarts.init(document.getElementById('typePieChart'));
+        typePieChart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0 },
+            series: [{
+                type: 'pie',
+                radius: ['40%', '70%'],
+                label: { show: true, formatter: '{b}: {c}' },
+                data: typeData,
+                color: ['#007bff', '#43b1ea', '#43ea7c']
+            }]
+        });
+
+        // 在线率仪表盘
+        const onlineGaugeChart = echarts.init(document.getElementById('onlineGaugeChart'));
+        onlineGaugeChart.setOption({
+            series: [{
+                type: 'gauge',
+                startAngle: 210,
+                endAngle: -30,
+                min: 0,
+                max: 1,
+                splitNumber: 5,
+                axisLine: {
+                    lineStyle: {
+                        width: 18,
+                        color: [
+                            [0.7, '#d9534f'],
+                            [0.9, '#ffc107'],
+                            [1, '#43ea7c']
+                        ]
+                    }
+                },
+                pointer: { width: 6, length: '60%' },
+                detail: {
+                    valueAnimation: true,
+                    formatter: v => Math.round(v * 100) + '%',
+                    fontSize: 32,
+                    color: '#007bff'
+                },
+                data: [{ value: onlineRate }]
+            }]
+        });
+    </script>
+</body>
+</html>

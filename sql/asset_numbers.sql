@@ -1,0 +1,4 @@
+CREATE TABLE asset_numbers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    asset_number VARCHAR(32) NOT NULL UNIQUE
+);

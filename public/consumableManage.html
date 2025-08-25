@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>耗材管理</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f8f9fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            padding: 40px;
+            width: 100vw;
+            max-width: 100vw;
+            min-width: 800px;
+            margin: 0;
+            box-sizing: border-box;
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .stat-card {
+            flex:1;
+            background:#007bff;
+            padding:24px;
+            border-radius:10px;
+            box-shadow:0 2px 8px #0001;
+            text-align:center;
+            color: #fff;
+        }
+        .stat-card div:first-child {
+            font-size:32px;
+            font-weight:bold;
+            color:#fff;
+        }
+        .stat-card div:last-child {
+            color:#fff;
+            margin-top:8px;
+        }
+        .table-scroll-x {
+            overflow-x: auto;
+            width: 100%;
+            position: relative;
+            margin-bottom: 0;
+        }
+        .table-scroll-y {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+            overflow-y: auto;
+            width: 100%;
+            position: relative;
+        }
+        table.consumable-table {
+            min-width: 1000px;
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+        }
+        table.consumable-table th, table.consumable-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+            background: #fff;
+        }
+        table.consumable-table th {
+            background: #f4f6fa;
+            color: #2d3e50;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        table.consumable-table th:last-child,
+        table.consumable-table td.action-cell {
+            position: sticky;
+            right: 0;
+            z-index: 11;
+            border-left: none !important;
+            box-shadow: none;
+            background: linear-gradient(to right, #007bff 0px, #fff 3px, #fff 6px);
+            text-align: center;
+            min-width: 120px;
+        }
+        .action-btn {
+            background: none;
+            border: none;
+            color: #007bff;
+            font-size: 15px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        .action-btn.delete { color: #d9534f; }
+        .action-btn.in { color: #43b1ea; }
+        .action-btn.out { color: #ff9800; }
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .pagination-bar .page-btn {
+            min-width: 32px;
+            padding: 2px 8px;
+            border: 1px solid #e0e0e0;
+            background: #fff;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-bar .page-btn.active {
+            background: #007bff;
+            color: #fff;
+            font-weight: bold;
+            border-color: #007bff;
+        }
+        .pagination-bar .page-btn:disabled {
+            color: #aaa;
+            background: #f4f6fa;
+            cursor: not-allowed;
+        }
+        .pagination-bar .jump-input {
+            width: 48px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            margin-left: 8px;
+        }
+        .pagination-bar .jump-btn {
+            padding: 2px 10px;
+            border-radius: 4px;
+            border: none;
+            background: #007bff;
+            color: #fff;
+            margin-left: 2px;
+            cursor: pointer;
+        }
+        @media (max-width: 1200px) {
+            .container { padding: 12px; min-width: 800px; }
+            table.consumable-table { min-width: 800px; }
+        }
+        @media (max-width: 900px) {
+            .container { padding: 4px; min-width: 800px; }
+            table.consumable-table { min-width: 800px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部统计卡片 -->
+        <div style="display:flex;gap:24px;margin-bottom:32px;">
+            <div class="stat-card" id="statCardPrinter" style="cursor:pointer;">
+                <div id="printerConsumableCount">0</div>
+                <div>打印机耗材数量</div>
+            </div>
+            <div class="stat-card" id="statCardComputer" style="cursor:pointer;">
+                <div id="computerPartCount">0</div>
+                <div>计算机配件数量</div>
+            </div>
+            <div class="stat-card" id="statCardMonitor" style="cursor:pointer;">
+                <div id="monitorPartCount">0</div>
+                <div>监控配件数量</div>
+            </div>
+        </div>
+        <!-- 搜索表单 -->
+        <form id="consumableSearchForm" style="margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap;">
+            <input type="text" name="keyword" placeholder="名称/类型/型号/规格/条码/备注模糊搜索" style="flex:1;min-width:220px;">
+            <button type="submit">查询</button>
+        </form>
+        <!-- 操作按钮 -->
+        <div style="margin-bottom:12px;">
+            <button id="addConsumableBtn" style="background:#007bff;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">新增</button>
+            <button id="batchDeleteConsumableBtn" style="background:#d9534f;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">批量删除</button>
+        </div>
+        <!-- 列表 -->
+        <div class="table-scroll-x">
+            <div class="table-scroll-y" id="consumableTableScrollY">
+                <table class="consumable-table" id="consumableTable">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;text-align:center;">
+                                <input type="checkbox" id="selectAllConsumable" style="cursor:pointer;">
+                            </th>
+                            <th>序号</th>
+                            <th>名称</th>
+                            <th>类型</th>
+                            <th>型号</th>
+                            <th>规格</th>
+                            <th>条码</th>
+                            <th>库存数量</th>
+                            <th>更新时间</th>
+                            <th>备注</th>
+                            <th style="min-width:160px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="consumableTableBody">
+                        <!-- 数据行由JS渲染 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- 分页控件 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;">
+            <div>
+                每页
+                <select id="pageSizeSelect" style="padding:4px 12px;">
+                    <option value="10">10行</option>
+                    <option value="20">20行</option>
+                    <option value="50">50行</option>
+                </select>
+            </div>
+            <div id="paginationBar" class="pagination-bar"></div>
+        </div>
+        <!-- 新增耗材抽屉 -->
+        <div id="addConsumableDrawer" style="position:fixed;top:0;right:-420px;width:400px;height:100vh;background:#fff;box-shadow:-2px 0 16px #0002;z-index:3000;transition:right 0.3s;overflow-y:auto;">
+            <div style="padding:32px 24px;">
+                <h3 style="margin-top:0;">新增耗材</h3>
+                <form id="addConsumableForm">
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">名称 <span style="color:red">*</span></label>
+                        <input type="text" name="name" required style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">类型 <span style="color:red">*</span></label>
+                        <select name="type" required style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                            <option value="">请选择</option>
+                            <option value="打印机耗材">打印机耗材</option>
+                            <option value="计算机配件">计算机配件</option>
+                            <option value="监控配件">监控配件</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">型号</label>
+                        <input type="text" name="model" style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">规格</label>
+                        <input type="text" name="spec" style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">条码</label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="text" name="barcode" id="addConsumableBarcodeInput" style="flex:1;padding:6px 10px;border-radius:4px;border:1px solid #ccc;" autocomplete="off" placeholder="可扫码输入">
+                            <button type="button" id="scanBarcodeBtn" style="padding:6px 12px;border-radius:4px;background:#43b1ea;color:#fff;border:none;cursor:pointer;">扫码</button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">库存数量</label>
+                        <input type="number" name="stock" min="0" value="0" style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">备注</label>
+                        <input type="text" name="remark" style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="text-align:right;margin-top:18px;">
+                        <button type="submit" style="background:#007bff;color:#fff;padding:8px 32px;border-radius:6px;">提交</button>
+                        <button type="button" id="closeAddConsumableDrawerBtn" style="background:#6c757d;color:#fff;padding:8px 32px;border-radius:6px;margin-left:8px;">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 遮罩层 -->
+        <div id="addConsumableDrawerMask" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:2999;"></div>
+
+        <!-- 编辑耗材抽屉：与新增风格一致，从右侧滑出 -->
+        <div id="editConsumableDrawer" style="position:fixed;top:0;right:-420px;width:400px;height:100vh;background:#fff;box-shadow:-2px 0 16px #0002;z-index:3001;transition:right 0.3s;overflow-y:auto;">
+            <div style="padding:32px 24px;">
+                <h3 style="margin-top:0;">编辑耗材</h3>
+                <form id="editConsumableForm">
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">名称 <span style="color:red">*</span></label>
+                        <input type="text" name="name" required style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">类型 <span style="color:red">*</span></label>
+                        <select name="type" required style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                            <option value="">请选择</option>
+                            <option value="打印机耗材">打印机耗材</option>
+                            <option value="计算机配件">计算机配件</option>
+                            <option value="监控配件">监控配件</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">型号</label>
+                        <input type="text" name="model" style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">规格</label>
+                        <input type="text" name="spec" style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">条码</label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="text" name="barcode" id="editConsumableBarcodeInput" style="flex:1;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                            <button type="button" id="scanBarcodeBtnEdit" style="padding:6px 12px;border-radius:4px;background:#43b1ea;color:#fff;border:none;cursor:pointer;">扫码</button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-weight:500;color:#2d3e50;">备注</label>
+                        <input type="text" name="remark" style="width:100%;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                    </div>
+                    <div style="color:#888;margin-bottom:8px;">提示：编辑不可修改库存数量；名称/类型/型号/规格变更会同步到入库/出库明细（备注不变）。</div>
+                    <div style="text-align:right;margin-top:18px;">
+                        <button type="submit" style="background:#007bff;color:#fff;padding:8px 32px;border-radius:6px;">保存</button>
+                        <button type="button" id="closeEditConsumableDrawerBtn" style="background:#6c757d;color:#fff;padding:8px 32px;border-radius:6px;margin-left:8px;">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div id="editConsumableDrawerMask" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:3000;"></div>
+
+        <!-- 通用：摄像头扫码浮层 -->
+        <div id="barcodeScannerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:4000;align-items:center;justify-content:center;">
+            <div style="background:#fff;padding:16px 16px 12px 16px;border-radius:10px;box-shadow:0 2px 24px #0003;width:92vw;max-width:520px;">
+                <div style="font-weight:600;margin-bottom:8px;color:#2d3e50;">扫码</div>
+                <div id="barcodeReader" style="width:100%;min-height:260px;border:1px dashed #ddd;border-radius:8px;overflow:hidden;"></div>
+                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+                    <button type="button" id="closeBarcodeScannerBtn" style="background:#6c757d;color:#fff;padding:6px 18px;border-radius:6px;border:none;cursor:pointer;">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 数据变量
+        let consumableList = [];
+        let filteredList = [];
+        let currentPage = 1;
+        let pageSize = 10;
+
+        // 从后端获取耗材数据
+        function fetchConsumableList() {
+            fetch('../api/consumable')
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        consumableList = res.data;
+                        filteredList = consumableList;
+                        renderStats();
+                        renderTablePage();
+                    } else {
+                        consumableList = [];
+                        filteredList = [];
+                        renderStats();
+                        renderTablePage();
+                    }
+                });
+        }
+
+        function renderStats() {
+            let printer = consumableList.filter(x => x.type === '打印机耗材').length;
+            let computer = consumableList.filter(x => x.type === '计算机配件').length;
+            let monitor = consumableList.filter(x => x.type === '监控配件').length;
+            document.getElementById('printerConsumableCount').innerText = printer;
+            document.getElementById('computerPartCount').innerText = computer;
+            document.getElementById('monitorPartCount').innerText = monitor;
+        }
+
+        function renderTablePage() {
+            const total = filteredList.length;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            currentPage = Math.min(currentPage, totalPages);
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, total);
+            const pageData = filteredList.slice(startIdx, endIdx);
+
+            const tbody = document.getElementById('consumableTableBody');
+            tbody.innerHTML = '';
+            pageData.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="rowConsumableCheckbox" data-idx="${startIdx + idx}" data-id="${item.id || ''}" style="cursor:pointer;">
+                    </td>
+                    <td>${startIdx + idx + 1}</td>
+                    <td>${item.name || ''}</td>
+                    <td>${item.type || ''}</td>
+                    <td>${item.model || ''}</td>
+                    <td>${item.spec || ''}</td>
+                    <td>${item.barcode || ''}</td>
+                    <td>${item.stock || 0}</td>
+                    <td>${item.updated_at || ''}</td>
+                    <td>${item.remark || ''}</td>
+                    <td class="action-cell">
+                        <button class="action-btn" onclick="editConsumable(${startIdx + idx})">编辑</button>
+                        <button class="action-btn in" onclick="inStock(${startIdx + idx})">入库</button>
+                        <button class="action-btn out" onclick="outStock(${startIdx + idx})">出库</button>
+                        <button class="action-btn delete" onclick="deleteConsumableById(${item.id || 'null'})">删除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 全选
+            const selectAll = document.getElementById('selectAllConsumable');
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.onclick = function() {
+                    const checked = this.checked;
+                    document.querySelectorAll('.rowConsumableCheckbox').forEach(cb => { cb.checked = checked; });
+                };
+            }
+            document.querySelectorAll('.rowConsumableCheckbox').forEach(cb => {
+                cb.onclick = function() {
+                    const all = document.querySelectorAll('.rowConsumableCheckbox');
+                    const allChecked = Array.from(all).every(x => x.checked);
+                    if (selectAll) selectAll.checked = allChecked;
+                };
+            });
+
+            renderPaginationBar(totalPages);
+        }
+
+        function renderPaginationBar(totalPages) {
+            const bar = document.getElementById('paginationBar');
+            const total = filteredList.length;
+            if (totalPages <= 1) {
+                bar.innerHTML = `共 ${total} 条数据`;
+                return;
+            }
+            let html = `共 ${total} 条数据 `;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoPage(1)">首页</button>`;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoPage(${currentPage - 1})">上一页</button>`;
+            let pageBtns = [];
+            let maxShow = 7;
+            if (totalPages <= maxShow) {
+                for (let i = 1; i <= totalPages; i++) {
+                    pageBtns.push(i);
+                }
+            } else {
+                if (currentPage <= 4) {
+                    pageBtns = [1,2,3,4,5,'...',totalPages];
+                } else if (currentPage >= totalPages - 3) {
+                    pageBtns = [1,'...',totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages];
+                } else {
+                    pageBtns = [1,'...',currentPage-1,currentPage,currentPage+1,'...',totalPages];
+                }
+            }
+            pageBtns.forEach(p => {
+                if (p === '...') {
+                    html += `<span style="padding:0 4px;">...</span>`;
+                } else {
+                    html += `<button class="page-btn${p===currentPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`;
+                }
+            });
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoPage(${currentPage + 1})">下一页</button>`;
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoPage(${totalPages})">末页</button>`;
+            html += `<span style="margin-left:8px;">跳至</span>
+                <input type="number" min="1" max="${totalPages}" id="jumpPageInput" class="jump-input" value="${currentPage}">
+                <button class="jump-btn" onclick="jumpToPage(${totalPages})">确定</button>`;
+            bar.innerHTML = html;
+            document.getElementById('jumpPageInput').onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    jumpToPage(totalPages);
+                }
+            };
+        }
+
+        window.gotoPage = function(page) {
+            page = Math.max(1, Math.min(page, Math.ceil(filteredList.length / pageSize)));
+            currentPage = page;
+            renderTablePage();
+        };
+
+        window.jumpToPage = function(totalPages) {
+            const input = document.getElementById('jumpPageInput');
+            let val = parseInt(input.value, 10);
+            if (!val || val < 1 || val > totalPages) return;
+            gotoPage(val);
+        };
+
+        document.getElementById('pageSizeSelect').onchange = function() {
+            pageSize = parseInt(this.value, 10);
+            currentPage = 1;
+            renderTablePage();
+        };
+
+        // 搜索表单
+        document.getElementById('consumableSearchForm').onsubmit = function(e) {
+            e.preventDefault();
+            const kw = this.keyword.value.trim();
+            if (!kw) {
+                filteredList = consumableList;
+            } else {
+                filteredList = consumableList.filter(item =>
+                    Object.values(item).some(val =>
+                        val && String(val).toLowerCase().includes(kw.toLowerCase())
+                    )
+                );
+            }
+            currentPage = 1;
+            renderTablePage();
+            highlightStatCard('');
+        };
+
+        // 新增、编辑、入库、出库、删除等操作（仅示例弹窗/alert）
+        document.getElementById('addConsumableBtn').onclick = function() {
+            showAddConsumableModal();
+        };
+        window.editConsumable = function(idx) { showEditConsumableModal(idx); };
+
+        // 编辑弹窗（不可修改库存）
+        function showEditConsumableModal(idx) {
+            // idx 来自渲染时的 startIdx + idx，指向 filteredList 的绝对索引更稳妥
+            const item = filteredList[idx];
+            if (!item) return;
+            let old = document.getElementById('editConsumableModal');
+            if (old) old.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'editConsumableModal';
+            modal.style = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:3100;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div style="background:#fff;padding:28px 28px 20px 28px;border-radius:12px;box-shadow:0 2px 24px #0003;min-width:360px;max-width:96vw;">
+                    <h3 style="margin-top:0;">编辑耗材</h3>
+                    <form id="editConsumableForm">
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">名称 <span style="color:red">*</span></label>
+                            <input type="text" name="name" value="${item.name || ''}" required style="width:260px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">类型 <span style="color:red">*</span></label>
+                            <select name="type" required style="width:260px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                                <option value="">请选择</option>
+                                <option value="打印机耗材" ${item.type==='打印机耗材'?'selected':''}>打印机耗材</option>
+                                <option value="计算机配件" ${item.type==='计算机配件'?'selected':''}>计算机配件</option>
+                                <option value="监控配件" ${item.type==='监控配件'?'selected':''}>监控配件</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">型号</label>
+                            <input type="text" name="model" value="${item.model || ''}" style="width:260px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">规格</label>
+                            <input type="text" name="spec" value="${item.spec || ''}" style="width:260px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">条码</label>
+                            <input type="text" name="barcode" value="${item.barcode || ''}" style="width:260px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">备注</label>
+                            <input type="text" name="remark" value="${item.remark || ''}" style="width:260px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="color:#888;margin-bottom:8px;">提示：编辑时不可修改库存数量；名称/类型/型号/规格变更会同步到入库/出库明细。</div>
+                        <div style="text-align:right;margin-top:10px;">
+                            <button type="button" id="cancelEditConsumableBtn" style="background:#6c757d;color:#fff;padding:6px 20px;border-radius:6px;margin-right:8px;">取消</button>
+                            <button type="submit" style="background:#007bff;color:#fff;padding:6px 20px;border-radius:6px;">保存</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('cancelEditConsumableBtn').onclick = () => modal.remove();
+            modal.onclick = (e)=>{ if (e.target === modal) modal.remove(); };
+
+            document.getElementById('editConsumableForm').onsubmit = function(e) {
+                e.preventDefault();
+                const fd = new FormData(this);
+                let payload = {};
+                fd.forEach((v, k) => { payload[k] = v; });
+                // 明确不提交 stock 字段（后端也会忽略）
+                if ('stock' in payload) delete payload.stock;
+
+                fetch(`/api/consumable/${item.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        modal.remove();
+                        fetchConsumableList();
+                    } else {
+                        alert(res.msg || '保存失败');
+                    }
+                })
+                .catch(()=>alert('网络错误，保存失败'));
+            };
+        }
+
+        // 入库弹窗逻辑（改为调用后端）
+        function showInStockModal(idx) {
+            const item = consumableList[idx];
+            if (!item) return;
+            let old = document.getElementById('inStockModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'inStockModal';
+            modal.style = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:3000;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div style="background:#fff;padding:32px 32px 24px 32px;border-radius:12px;box-shadow:0 2px 24px #0003;min-width:340px;max-width:96vw;">
+                    <h3 style="margin-top:0;">耗材入库</h3>
+                    <form id="inStockForm">
+                        <div style="margin-bottom:8px;color:#666;">${item.name || ''}｜${item.type || ''}｜${item.model || ''}｜${item.spec || ''}</div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">入库数量：</label>
+                            <input type="number" name="in_count" min="1" required style="width:140px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">备注：</label>
+                            <input type="text" name="remark" placeholder="默认：入库" style="width:240px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="text-align:right;margin-top:18px;">
+                            <button type="button" id="cancelInStockBtn" style="background:#6c757d;color:#fff;padding:8px 28px;border-radius:6px;margin-right:8px;">取消</button>
+                            <button type="submit" style="background:#007bff;color:#fff;padding:8px 28px;border-radius:6px;">提交</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('cancelInStockBtn').onclick = () => modal.remove();
+            modal.onclick = (e)=>{ if (e.target === modal) modal.remove(); };
+            document.getElementById('inStockForm').onsubmit = function(e) {
+                e.preventDefault();
+                const fd = new FormData(this);
+                const count = parseInt(fd.get('in_count'), 10);
+                if (!count || count < 1) return alert('入库数量必须大于0');
+                const remark = (fd.get('remark') || '').trim();
+                fetch(`/api/consumable/${item.id}/in`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ in_count: count, remark })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        modal.remove();
+                        fetchConsumableList();
+                    } else {
+                        alert(res.msg || '入库失败');
+                    }
+                })
+                .catch(()=>alert('网络错误，入库失败'));
+            };
+        }
+        window.inStock = function(idx) { showInStockModal(idx); };
+
+        // 出库弹窗逻辑（新增）
+        function showOutStockModal(idx) {
+            const item = consumableList[idx];
+            if (!item) return;
+            let old = document.getElementById('outStockModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'outStockModal';
+            modal.style = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:3000;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div style="background:#fff;padding:32px 32px 24px 32px;border-radius:12px;box-shadow:0 2px 24px #0003;min-width:340px;max-width:96vw;">
+                    <h3 style="margin-top:0;">耗材出库</h3>
+                    <form id="outStockForm">
+                        <div style="margin-bottom:8px;color:#666;">${item.name || ''}｜${item.type || ''}｜${item.model || ''}｜${item.spec || ''}</div>
+                        <div style="margin-bottom:8px;color:#999;">当前库存：${item.stock || 0}</div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">出库数量：</label>
+                            <input type="number" name="out_count" min="1" max="${item.stock || 0}" required style="width:140px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">备注：</label>
+                            <input type="text" name="remark" placeholder="默认：出库" style="width:240px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="text-align:right;margin-top:18px;">
+                            <button type="button" id="cancelOutStockBtn" style="background:#6c757d;color:#fff;padding:8px 28px;border-radius:6px;margin-right:8px;">取消</button>
+                            <button type="submit" style="background:#ff9800;color:#fff;padding:8px 28px;border-radius:6px;">提交</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('cancelOutStockBtn').onclick = () => modal.remove();
+            modal.onclick = (e)=>{ if (e.target === modal) modal.remove(); };
+            document.getElementById('outStockForm').onsubmit = function(e) {
+                e.preventDefault();
+                const fd = new FormData(this);
+                const count = parseInt(fd.get('out_count'), 10);
+                if (!count || count < 1) return alert('出库数量必须大于0');
+                if (count > (parseInt(item.stock, 10) || 0)) return alert('库存不足');
+                const remark = (fd.get('remark') || '').trim();
+                fetch(`/api/consumable/${item.id}/out`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ out_count: count, remark })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        modal.remove();
+                        fetchConsumableList();
+                    } else {
+                        alert(res.msg || '出库失败');
+                    }
+                })
+                .catch(()=>alert('网络错误，出库失败'));
+            };
+        }
+        window.outStock = function(idx) { showOutStockModal(idx); };
+
+        // 后端删除（单条）
+        window.deleteConsumableById = function(id) {
+            if (!id) { alert('缺少ID，无法删除'); return; }
+            if (!confirm('确定要删除该耗材吗？')) return;
+            fetch(`/api/consumable/${id}`, { method: 'DELETE' })
+                .then(res => res.ok ? res.json() : Promise.reject())
+                .then(res => {
+                    if (res && res.code === 0) {
+                        fetchConsumableList();
+                    } else {
+                        alert((res && res.msg) || '删除失败');
+                    }
+                })
+                .catch(() => alert('网络错误，删除失败'));
+        };
+
+        // 批量删除改为调用后端逐条删除（保留）
+        document.getElementById('batchDeleteConsumableBtn').onclick = function() {
+            const checked = Array.from(document.querySelectorAll('.rowConsumableCheckbox')).filter(cb => cb.checked);
+            if (!checked.length) { alert('请先选择要删除的耗材'); return; }
+            const ids = checked.map(cb => cb.getAttribute('data-id')).filter(Boolean);
+            if (!ids.length) { alert('未找到所选项的ID'); return; }
+            if (!confirm(`确定要删除选中的${ids.length}项吗？`)) return;
+
+            Promise.all(ids.map(id =>
+                fetch(`/api/consumable/${id}`, { method: 'DELETE' })
+                    .then(r => r.ok ? r.json() : { code: 1 })
+                    .catch(() => ({ code: 1 }))
+            )).then(results => {
+                const failed = results.filter(r => !r || r.code !== 0).length;
+                if (failed) alert(`删除完成，但有 ${failed} 条失败`);
+                fetchConsumableList();
+            });
+        };
+
+        /* 删除下方这段会覆盖后端删除的本地数组删除逻辑，避免触发器/应用层记录失效
+        document.getElementById('batchDeleteConsumableBtn').onclick = function() {
+            const checked = Array.from(document.querySelectorAll('.rowConsumableCheckbox')).filter(cb => cb.checked);
+            if (!checked.length) {
+                alert('请先选择要删除的耗材');
+                return;
+            }
+            if (!confirm(`确定要删除选中的${checked.length}项吗？`)) return;
+            checked.map(cb => parseInt(cb.getAttribute('data-idx'), 10)).sort((a,b)=>b-a).forEach(idx => {
+                consumableList.splice(idx, 1);
+            });
+            filteredList = consumableList;
+            renderStats();
+            renderTablePage();
+        };
+        */
+
+        // 卡片筛选功能
+        document.getElementById('statCardPrinter').onclick = function() {
+            filteredList = consumableList.filter(x => x.type === '打印机耗材');
+            currentPage = 1;
+            renderTablePage();
+            highlightStatCard('printer');
+        };
+        document.getElementById('statCardComputer').onclick = function() {
+            filteredList = consumableList.filter(x => x.type === '计算机配件');
+            currentPage = 1;
+            renderTablePage();
+            highlightStatCard('computer');
+        };
+        document.getElementById('statCardMonitor').onclick = function() {
+            filteredList = consumableList.filter(x => x.type === '监控配件');
+            currentPage = 1;
+            renderTablePage();
+            highlightStatCard('monitor');
+        };
+        function highlightStatCard(type) {
+            document.getElementById('statCardPrinter').style.boxShadow = type === 'printer' ? '0 0 0 3px #007bff55' : '0 2px 8px #0001';
+            document.getElementById('statCardComputer').style.boxShadow = type === 'computer' ? '0 0 0 3px #007bff55' : '0 2px 8px #0001';
+            document.getElementById('statCardMonitor').style.boxShadow = type === 'monitor' ? '0 0 0 3px #007bff55' : '0 2px 8px #0001';
+        }
+
+        // 新增弹窗逻辑
+        function showAddConsumableModal() {
+            let old = document.getElementById('addConsumableModal');
+            if (old) old.remove();
+            const modal = document.createElement('div');
+            modal.id = 'addConsumableModal';
+            modal.style = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:3000;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div style="background:#fff;padding:32px 32px 24px 32px;border-radius:12px;box-shadow:0 2px 24px #0003;min-width:340px;max-width:96vw;">
+                    <h3 style="margin-top:0;">新增耗材</h3>
+                    <form id="addConsumableForm">
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">名称 <span style="color:red">*</span></label>
+                            <input type="text" name="name" required style="width:220px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">类型 <span style="color:red">*</span></label>
+                            <select name="type" required style="width:220px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                                <option value="">请选择</option>
+                                <option value="打印机耗材">打印机耗材</option>
+                                <option value="计算机配件">计算机配件</option>
+                                <option value="监控配件">监控配件</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">型号</label>
+                            <input type="text" name="model" style="width:220px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">规格</label>
+                            <input type="text" name="spec" style="width:220px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">条码</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="text" name="barcode" id="addConsumableBarcodeInput" style="flex:1;padding:6px 10px;border-radius:4px;border:1px solid #ccc;" autocomplete="off" placeholder="可扫码输入">
+                                <button type="button" id="scanBarcodeBtn" style="padding:6px 12px;border-radius:4px;background:#43b1ea;color:#fff;border:none;cursor:pointer;">扫码</button>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">库存数量</label>
+                            <input type="number" name="stock" min="0" value="0" style="width:120px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="font-weight:500;color:#2d3e50;">备注</label>
+                            <input type="text" name="remark" style="width:220px;padding:6px 10px;border-radius:4px;border:1px solid #ccc;">
+                        </div>
+                        <div style="text-align:right;margin-top:18px;">
+                            <button type="button" id="cancelAddConsumableBtn" style="background:#6c757d;color:#fff;padding:8px 32px;border-radius:6px;margin-right:8px;">取消</button>
+                            <button type="submit" style="background:#007bff;color:#fff;padding:8px 32px;border-radius:6px;">提交</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('cancelAddConsumableBtn').onclick = function() {
+                modal.remove();
+            };
+            modal.onclick = function(e) {
+                if (e.target === modal) modal.remove();
+            };
+            document.getElementById('addConsumableForm').onsubmit = function(e) {
+                e.preventDefault();
+                const fd = new FormData(this);
+                let data = {};
+                fd.forEach((v, k) => { data[k] = v; });
+                fetch('../api/consumable', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        modal.remove();
+                        fetchConsumableList();
+                    } else {
+                        alert(res.msg || '新增失败');
+                    }
+                })
+                .catch(() => alert('网络错误，新增失败'));
+            };
+        }
+
+        document.getElementById('addConsumableBtn').onclick = function() {
+            showAddConsumableModal();
+        };
+
+        // 新增耗材抽屉逻辑
+        const addConsumableDrawer = document.getElementById('addConsumableDrawer');
+        const addConsumableDrawerMask = document.getElementById('addConsumableDrawerMask');
+        document.getElementById('addConsumableBtn').onclick = function() {
+            addConsumableDrawer.style.right = '0';
+            addConsumableDrawerMask.style.display = 'block';
+            document.getElementById('addConsumableForm').reset();
+        };
+        document.getElementById('closeAddConsumableDrawerBtn').onclick = function() {
+            addConsumableDrawer.style.right = '-420px';
+            addConsumableDrawerMask.style.display = 'none';
+        };
+        addConsumableDrawerMask.onclick = function() {
+            addConsumableDrawer.style.right = '-420px';
+            addConsumableDrawerMask.style.display = 'none';
+        };
+        document.getElementById('addConsumableForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            let data = {};
+            fd.forEach((v, k) => { data[k] = v; });
+            fetch('../api/consumable', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) {
+                    addConsumableDrawer.style.right = '-420px';
+                    addConsumableDrawerMask.style.display = 'none';
+                    fetchConsumableList();
+                } else {
+                    alert(res.msg || '新增失败');
+                }
+            })
+            .catch(() => alert('网络错误，新增失败'));
+        };
+
+        // 条码扫码功能（摄像头扫码 + 扫码枪）
+        // 1) 摄像头扫码：使用 html5-qrcode（CDN懒加载）
+        let qrScanner = null;
+        let currentScanTargetInputId = null;
+        function ensureHtml5Qrcode(cb) {
+            if (window.Html5Qrcode) { cb(); return; }
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/minified/html5-qrcode.min.js';
+            s.onload = () => cb();
+            s.onerror = () => alert('扫码库加载失败，请检查网络');
+            document.body.appendChild(s);
+        }
+        function openBarcodeScanner(targetInputId) {
+            currentScanTargetInputId = targetInputId;
+            const overlay = document.getElementById('barcodeScannerOverlay');
+            overlay.style.display = 'flex';
+            ensureHtml5Qrcode(startScanner);
+        }
+        function startScanner() {
+            const boxId = 'barcodeReader';
+            // 如已有实例，先停止清理再启动
+            const init = () => {
+                qrScanner = new Html5Qrcode(boxId);
+                const config = { fps: 10, qrbox: { width: 280, height: 180 } };
+                Html5Qrcode.getCameras().then(cameras => {
+                    const camId = (cameras && cameras[0]) ? cameras[0].id : undefined;
+                    qrScanner.start(camId, config, onScanSuccess, () => {}).catch(() => {
+                        alert('无法启动摄像头，请检查权限或在HTTPS环境下访问');
+                        closeBarcodeScanner();
+                    });
+                }).catch(() => {
+                    alert('无法获取摄像头设备');
+                    closeBarcodeScanner();
+                });
+            };
+            if (qrScanner) {
+                qrScanner.stop().then(() => { qrScanner.clear(); init(); }).catch(init);
+            } else {
+                init();
+            }
+        }
+        function onScanSuccess(text) {
+            if (currentScanTargetInputId) {
+                const input = document.getElementById(currentScanTargetInputId);
+                if (input) {
+                    input.value = text;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+            closeBarcodeScanner();
+        }
+        function closeBarcodeScanner() {
+            const overlay = document.getElementById('barcodeScannerOverlay');
+            overlay.style.display = 'none';
+            if (qrScanner) {
+                qrScanner.stop().then(() => qrScanner.clear()).finally(() => { qrScanner = null; });
+            }
+        }
+        document.getElementById('closeBarcodeScannerBtn').onclick = closeBarcodeScanner;
+
+        // 绑定“扫码”按钮（新增抽屉 + 编辑抽屉）
+        // 新增抽屉按钮：优先打开摄像头扫码；若使用扫码枪，直接聚焦到输入框后扫描即可
+        document.getElementById('scanBarcodeBtn').onclick = function() {
+            const input = document.getElementById('addConsumableBarcodeInput');
+            if (navigator.mediaDevices && location.protocol === 'https:') {
+                openBarcodeScanner('addConsumableBarcodeInput');
+            } else {
+                // 回退：不具备摄像头或非HTTPS，使用扫码枪
+                input.focus();
+                input.style.borderColor = '#43b1ea';
+                setTimeout(() => { input.style.borderColor = '#ccc'; }, 1500);
+            }
+        };
+        // 编辑抽屉按钮
+        document.getElementById('scanBarcodeBtnEdit').onclick = function() {
+            const input = document.getElementById('editConsumableBarcodeInput');
+            if (navigator.mediaDevices && location.protocol === 'https:') {
+                openBarcodeScanner('editConsumableBarcodeInput');
+            } else {
+                input.focus();
+                input.style.borderColor = '#43b1ea';
+                setTimeout(() => { input.style.borderColor = '#ccc'; }, 1500);
+            }
+        };
+
+        // 打开编辑抽屉并填充数据
+        const editConsumableDrawer = document.getElementById('editConsumableDrawer');
+        const editConsumableDrawerMask = document.getElementById('editConsumableDrawerMask');
+        const editConsumableForm = document.getElementById('editConsumableForm');
+        const closeEditConsumableDrawerBtn = document.getElementById('closeEditConsumableDrawerBtn');
+
+        function openEditConsumableDrawer(idx) {
+            const item = filteredList[idx];
+            if (!item) return;
+            // 存放当前编辑ID
+            editConsumableForm.dataset.id = item.id;
+
+            // 填充表单
+            editConsumableForm.name.value = item.name || '';
+            editConsumableForm.type.value = item.type || '';
+            editConsumableForm.model.value = item.model || '';
+            editConsumableForm.spec.value = item.spec || '';
+            editConsumableForm.barcode.value = item.barcode || '';
+            editConsumableForm.remark.value = item.remark || '';
+
+            // 打开抽屉和遮罩
+            editConsumableDrawer.style.right = '0';
+            editConsumableDrawerMask.style.display = 'block';
+        }
+
+        // 关闭编辑抽屉
+        function closeEditConsumableDrawer() {
+            editConsumableDrawer.style.right = '-420px';
+            editConsumableDrawerMask.style.display = 'none';
+            editConsumableForm.reset();
+            delete editConsumableForm.dataset.id;
+        }
+
+        closeEditConsumableDrawerBtn.onclick = closeEditConsumableDrawer;
+        editConsumableDrawerMask.onclick = closeEditConsumableDrawer;
+
+        // 提交编辑
+        editConsumableForm.onsubmit = function(e) {
+            e.preventDefault();
+            const id = editConsumableForm.dataset.id;
+            if (!id) return;
+
+            const fd = new FormData(editConsumableForm);
+            let payload = {};
+            fd.forEach((v, k) => { payload[k] = v; });
+            // 不提交库存
+            if ('stock' in payload) delete payload.stock;
+
+            fetch(`/api/consumable/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.code === 0) {
+                    closeEditConsumableDrawer();
+                    fetchConsumableList();
+                } else {
+                    alert(res.msg || '保存失败');
+                }
+            })
+            .catch(()=>alert('网络错误，保存失败'));
+        };
+
+        // 绑定编辑按钮到抽屉
+        window.editConsumable = function(idx) { openEditConsumableDrawer(idx); };
+
+        // 页面初始化时拉取数据
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchConsumableList();
+        });
+    </script>
+</body>
+</html>

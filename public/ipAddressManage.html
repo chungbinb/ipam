@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>IP地址管理</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f8f9fa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            padding: 40px;
+            width: 100vw;
+            max-width: 100vw;
+            min-width: 800px;
+            margin: 0;
+            box-sizing: border-box;
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+        h1 { font-size: 2rem; color: #2d3e50; margin-bottom: 32px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #fff; box-shadow: 0 2px 8px #0001; }
+        th, td { border: 1px solid #e0e0e0; padding: 10px 12px; text-align: left; }
+        th { background: #f4f6fa; color: #2d3e50; font-weight: 500; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        form { margin-bottom: 20px; }
+        input, select, button { margin-right: 8px; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 15px; }
+        input:focus, select:focus { border-color: #007bff; outline: none; }
+        button { background: #007bff; color: #fff; border: none; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #0056b3; }
+        .stat-card {
+            flex:1;
+            background:#007bff;
+            padding:16px;
+            border-radius:10px;
+            box-shadow:0 2px 8px #0001;
+            text-align:center;
+            color: #fff;
+            min-height: 48px;
+        }
+        .stat-card div:first-child {
+            font-size:18px;
+            font-weight:bold;
+            color:#fff;
+        }
+        .stat-card div:last-child {
+            color:#fff;
+            margin-top:4px;
+            font-size:15px;
+        }
+        #editModal {
+            display:none; position:fixed; top:0; left:0; width:100vw; height:100vh;
+            background:rgba(0,0,0,0.18); z-index:999;
+        }
+        .modal-content {
+            background:#fff; padding:32px 24px; border-radius:10px; max-width:400px;
+            margin:80px auto; box-shadow:0 2px 16px #0002;
+        }
+        .modal-content h3 { margin-top:0; color:#2d3e50; }
+        .modal-content label { font-weight:500; color:#2d3e50; }
+        .modal-content input, .modal-content select { width:100%; margin-bottom:12px; }
+        .modal-actions { text-align:right; margin-top:16px; }
+        .modal-actions button { margin-left:8px; }
+        .danger-btn { background:#d9534f; }
+        .danger-btn:hover { background:#b52a1a; }
+        .main-content-limit {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+        .table-scroll-x {
+            overflow-x: auto;
+            width: 100%;
+            position: relative;
+            margin-bottom: 0;
+            flex: 1 1 auto;
+        }
+        .table-scroll-y {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: auto;
+            max-height: 100%;
+            overflow-y: auto;
+            width: 100%;
+            position: relative;
+        }
+        .fixed-right-shadow {
+            display: none !important;
+        }
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .pagination-bar .page-btn {
+            min-width: 32px;
+            padding: 2px 8px;
+            border: 1px solid #e0e0e0;
+            background: #fff;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-bar .page-btn.active {
+            background: #007bff;
+            color: #fff;
+            font-weight: bold;
+            border-color: #007bff;
+        }
+        .pagination-bar .page-btn:disabled {
+            color: #aaa;
+            background: #f4f6fa;
+            cursor: not-allowed;
+        }
+        .pagination-bar .jump-input {
+            width: 48px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            margin-left: 8px;
+        }
+        .pagination-bar .jump-btn {
+            padding: 2px 10px;
+            border-radius: 4px;
+            border: none;
+            background: #007bff;
+            color: #fff;
+            margin-left: 2px;
+            cursor: pointer;
+        }
+        table.ip-table {
+            min-width: 800px;
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+        }
+        table.ip-table th, table.ip-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+            background: #fff;
+        }
+        table.ip-table th {
+            background: #f4f6fa;
+            color: #2d3e50;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        table.ip-table th:last-child,
+        table.ip-table td.ip-table-action-cell {
+            position: sticky;
+            right: 0;
+            z-index: 11;
+            border-left: none !important;
+            box-shadow: none;
+            background: linear-gradient(to right, #007bff 0px, #fff 3px, #fff 6px);
+            text-align: center;
+        }
+        table.ip-table th:last-child {
+            background: linear-gradient(to right, #007bff 0px, #fff 3px, #fff 6px);
+            z-index: 12;
+            border-left: none !important;
+            box-shadow: none;
+            text-align: center;
+        }
+        .action-edit-btn {
+            background: none;
+            border: none;
+            color: #007bff;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 2px 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .action-edit-btn .icon {
+            font-size: 18px;
+            vertical-align: middle;
+            color: #007bff;
+            margin-right: 2px;
+        }
+        .edit-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.18); z-index: 2000;
+        }
+        .edit-modal.show {
+            display: block;
+        }
+        .edit-modal-content {
+            position: absolute;
+            top: 0; left: 0;
+            width: 400px; height: 100vh;
+            background: #fff;
+            border-radius: 0 10px 10px 0;
+            box-shadow: 2px 0 16px #0002;
+            padding: 32px 24px;
+            overflow-y: auto;
+            opacity: 0;
+            transform: translateX(-100%);
+            transition: transform 0.5s cubic-bezier(.4,0,.2,1), opacity 0.4s cubic-bezier(.4,0,.2,1);
+        }
+        .edit-modal.show .edit-modal-content.active {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .edit-modal-content.closing {
+            opacity: 0;
+            transform: translateX(-100%);
+        }
+        .edit-modal-content h3 {
+            margin-top: 0;
+            color: #2d3e50;
+        }
+        .edit-modal-content label {
+            font-weight: 500;
+            color: #2d3e50;
+            margin-top: 8px;
+            margin-bottom: 2px;
+            display: block;
+        }
+        .edit-modal-content input[type="text"], .edit-modal-content select {
+            width: 100%;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            box-sizing: border-box;
+            display: block;
+        }
+        .edit-modal-content input[type="text"]:focus, .edit-modal-content select:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        .edit-modal-content .modal-actions {
+            text-align: right;
+            margin-top: 16px;
+        }
+        .edit-modal-content .modal-actions button {
+            margin-left: 8px;
+            padding: 8px 24px;
+            border-radius: 4px;
+            border: none;
+            font-size: 15px;
+            cursor: pointer;
+            background: #007bff;
+            color: #fff;
+            transition: background 0.2s;
+        }
+        .edit-modal-content .modal-actions button:hover {
+            background: #0056b3;
+        }
+        .edit-modal-content .modal-actions button.cancel-btn {
+            background: #6c757d;
+            color: #fff;
+        }
+        .edit-modal-content .modal-actions button.cancel-btn:hover {
+            background: #495057;
+        }
+        @media (max-width: 1200px) {
+            .container { padding: 12px; min-width: 800px; }
+            table.ip-table { min-width: 800px; }
+        }
+        @media (max-width: 900px) {
+            .container { padding: 4px; min-width: 800px; }
+            table.ip-table { min-width: 800px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-content-limit">
+        <div style="display:flex;gap:24px;margin-bottom:24px;">
+            <div class="stat-card">
+                <div id="ipAddrCount">0</div>
+                <div>IP地址</div>
+            </div>
+            <div class="stat-card">
+                <div id="ipAssignedCount">0</div>
+                <div>已分配</div>
+            </div>
+            <div class="stat-card">
+                <div id="ipAvailableCount">0</div>
+                <div>可用</div>
+            </div>
+        </div>
+        <form id="ipAddrSearchForm" style="margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap;">
+            <input type="text" name="ip" placeholder="IP地址" style="padding:6px 12px;">
+            <input type="text" name="mac" placeholder="MAC地址" style="padding:6px 12px;">
+            <input type="text" name="hostname" placeholder="主机名称" style="padding:6px 12px;">
+            <input type="text" name="business" placeholder="使用业务" style="padding:6px 12px;">
+            <input type="text" name="department" placeholder="使用部门" style="padding:6px 12px;">
+            <input type="text" name="user" placeholder="使用人员" style="padding:6px 12px;">
+            <select name="status" style="padding:6px 12px;">
+                <option value="">全部状态</option>
+                <option value="已分配">已分配</option>
+                <option value="使用中">使用中</option>
+                <option value="未使用">未使用</option>
+                <option value="不可用">不可用</option>
+                <option value="未知">未知</option>
+            </select>
+            <button type="submit" style="padding:6px 18px;">查询</button>
+        </form>
+        <div style="margin-bottom:12px;">
+            <button id="pingIpAddrBtn" style="padding:6px 18px;margin-right:8px;">Ping</button>
+        </div>
+        <div class="table-scroll-y" style="position:relative;">
+            <table class="ip-table" id="ipTable">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>IP地址</th>
+                        <th>MAC地址</th>
+                        <th>主机名称</th>
+                        <th>使用业务</th>
+                        <th>使用部门</th>
+                        <th>使用人员</th>
+                        <th>资产编号</th>
+                        <th>状态标记</th>
+                        <th>手动标记</th>
+                        <th>ping状态</th>
+                        <th>上一次ping通时间</th>
+                        <th>备注</th>
+                        <th style="min-width:120px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="ipAddrTableBody">
+                </tbody>
+            </table>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;">
+            <div>
+                每页
+                <select id="pageSizeSelect" style="padding:4px 12px;">
+                    <option value="10">10行</option>
+                    <option value="20">20行</option>
+                    <option value="50">50行</option>
+                    <option value="100">100行</option>
+                </select>
+            </div>
+            <div id="paginationBar" class="pagination-bar"></div>
+        </div>
+        <div id="editIpModal" class="edit-modal">
+            <div class="edit-modal-content">
+                <h3>编辑IP地址</h3>
+                <form id="editIpForm">
+                    <input type="hidden" name="id">
+                    <label>IP地址</label>
+                    <input type="text" name="ip" readonly>
+                    <label>MAC地址</label>
+                    <input type="text" name="mac">
+                    <label>主机名称</label>
+                    <input type="text" name="hostname">
+                    <label>使用业务</label>
+                    <input type="text" name="business">
+                    <label>使用部门</label>
+                    <input type="text" name="department">
+                    <label>使用人员</label>
+                    <input type="text" name="user">
+                    <label>资产编号</label>
+                    <input type="text" name="asset_number">
+                    <label>手动标记</label>
+                    <select name="manual">
+                        <option value="">无</option>
+                        <option value="已分配">已分配</option>
+                        <option value="使用中">使用中</option>
+                        <option value="未使用">未使用</option>
+                        <option value="不可用">不可用</option>
+                        <option value="未知">未知</option>
+                    </select>
+                    <label>备注</label>
+                    <input type="text" name="remark">
+                    <div class="modal-actions">
+                        <button type="button" class="cancel-btn">取消</button>
+                        <button type="submit">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        let ipAddrList = [];
+        let currentPage = 1;
+        let pageSize = 10;
+        let filteredList = [];
+
+        function fetchIpAddrs() {
+            fetch('/ip-addresses')
+                .then(res => res.json())
+                .then(data => {
+                    ipAddrList = Array.isArray(data) ? data : [];
+                    renderIpAddrStats();
+                    filteredList = ipAddrList;
+                    renderIpAddrTablePage();
+                })
+                .catch(() => {
+                    ipAddrList = [];
+                    renderIpAddrStats();
+                    filteredList = [];
+                    renderIpAddrTablePage();
+                });
+        }
+
+        function renderIpAddrStats() {
+            const total = ipAddrList.length;
+            let assigned = 0;
+            let available = 0;
+            ipAddrList.forEach(item => {
+                if ((item.manual && item.manual !== '') || (item.status && item.status.includes('分配'))) {
+                    assigned++;
+                } else {
+                    available++;
+                }
+            });
+            document.getElementById('ipAddrCount').innerText = total;
+            document.getElementById('ipAssignedCount').innerText = assigned;
+            document.getElementById('ipAvailableCount').innerText = available;
+        }
+
+        function renderIpAddrTablePage() {
+            const total = filteredList.length;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            currentPage = Math.min(currentPage, totalPages);
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, total);
+            const pageData = filteredList.slice(startIdx, endIdx);
+
+            const tbody = document.getElementById('ipAddrTableBody');
+            tbody.innerHTML = '';
+            pageData.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${startIdx + idx + 1}</td>
+                    <td>${item.ip || ''}</td>
+                    <td>${item.mac || ''}</td>
+                    <td>${item.hostname || ''}</td>
+                    <td>${item.business || ''}</td>
+                    <td>${item.department || ''}</td>
+                    <td>${item.user || ''}</td>
+                    <td>${item.asset_number || ''}</td>
+                    <td>${item.status || ''}</td>
+                    <td>${item.manual || ''}</td>
+                    <td>${item.ping || ''}</td>
+                    <td>${item.ping_time || ''}</td>
+                    <td>${item.remark || ''}</td>
+                    <td class="ip-table-action-cell">
+                        <button class="action-edit-btn" onclick="editIpAddr(${item.id})">
+                            <span class="icon">&#9998;</span>
+                            <span>修改</span>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            renderPaginationBar(totalPages);
+        }
+
+        function renderPaginationBar(totalPages) {
+            const bar = document.getElementById('paginationBar');
+            const total = filteredList.length;
+            if (totalPages <= 1) {
+                bar.innerHTML = `共 ${total} 条数据`;
+                return;
+            }
+            let html = `共 ${total} 条数据 `;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoPage(1)">首页</button>`;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoPage(${currentPage - 1})">上一页</button>`;
+
+            let pageBtns = [];
+            let maxShow = 7;
+            if (totalPages <= maxShow) {
+                for (let i = 1; i <= totalPages; i++) {
+                    pageBtns.push(i);
+                }
+            } else {
+                if (currentPage <= 4) {
+                    pageBtns = [1,2,3,4,5,'...',totalPages];
+                } else if (currentPage >= totalPages - 3) {
+                    pageBtns = [1,'...',totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages];
+                } else {
+                    pageBtns = [1,'...',currentPage-1,currentPage,currentPage+1,'...',totalPages];
+                }
+            }
+            pageBtns.forEach(p => {
+                if (p === '...') {
+                    html += `<span style="padding:0 4px;">...</span>`;
+                } else {
+                    html += `<button class="page-btn${p===currentPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`;
+                }
+            });
+
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoPage(${currentPage + 1})">下一页</button>`;
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoPage(${totalPages})">末页</button>`;
+
+            html += `<span style="margin-left:8px;">跳至</span>
+                <input type="number" min="1" max="${totalPages}" id="jumpPageInput" class="jump-input" value="${currentPage}">
+                <button class="jump-btn" onclick="jumpToPage(${totalPages})">确定</button>`;
+
+            bar.innerHTML = html;
+
+            document.getElementById('jumpPageInput').onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    jumpToPage(totalPages);
+                }
+            };
+        }
+
+        window.gotoPage = function(page) {
+            page = Math.max(1, Math.min(page, Math.ceil(filteredList.length / pageSize)));
+            currentPage = page;
+            renderIpAddrTablePage();
+        };
+
+        window.jumpToPage = function(totalPages) {
+            const input = document.getElementById('jumpPageInput');
+            let val = parseInt(input.value, 10);
+            if (!val || val < 1 || val > totalPages) return;
+            gotoPage(val);
+        };
+
+        document.getElementById('pageSizeSelect').onchange = function() {
+            pageSize = parseInt(this.value, 10);
+            currentPage = 1;
+            renderIpAddrTablePage();
+        };
+
+        function renderIpAddrTable(list) {
+            filteredList = list;
+            currentPage = 1;
+            renderIpAddrTablePage();
+        }
+
+        document.getElementById('ipAddrSearchForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            const ipSel = (fd.get('ip') || '').trim();
+            const macSel = (fd.get('mac') || '').trim();
+            const hostSel = (fd.get('hostname') || '').trim();
+            const bizSel = (fd.get('business') || '').trim();
+            const depSel = (fd.get('department') || '').trim();
+            const userSel = (fd.get('user') || '').trim();
+            const statusSel = (fd.get('status') || '').trim();
+
+            const filtered = ipAddrList.filter(item => {
+                if (ipSel && !(item.ip || '').includes(ipSel)) return false;
+                if (macSel && !(item.mac || '').includes(macSel)) return false;
+                if (hostSel && !(item.hostname || '').includes(hostSel)) return false;
+                if (bizSel && !(item.business || '').includes(bizSel)) return false;
+                if (depSel && !(item.department || '').includes(depSel)) return false;
+                if (userSel && !(item.user || '').includes(userSel)) return false;
+                if (statusSel && (item.status || '') !== statusSel) return false;
+                return true;
+            });
+
+            renderIpAddrTable(filtered);
+        };
+
+        document.getElementById('pingIpAddrBtn').onclick = async function() {
+            if (!ipAddrList.length) return;
+            this.disabled = true;
+            this.innerText = '正在Ping...';
+            showPingProcessingModal();
+            fetch('/ping-ip-batch', { method: 'POST' })
+                .then(res => res.json())
+                .then(result => {})
+                .catch(() => {});
+            setTimeout(() => {
+                this.disabled = false;
+                this.innerText = 'Ping';
+            }, 1200);
+        };
+
+        function showPingProcessingModal() {
+            let modal = document.getElementById('pingProcessingModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'pingProcessingModal';
+                modal.style.position = 'fixed';
+                modal.style.top = '0';
+                modal.style.left = '0';
+                modal.style.width = '100vw';
+                modal.style.height = '100vh';
+                modal.style.background = 'rgba(0,0,0,0.18)';
+                modal.style.zIndex = '3000';
+                modal.style.display = 'flex';
+                modal.style.alignItems = 'center';
+                modal.style.justifyContent = 'center';
+                modal.innerHTML = `<div style="background:#fff;padding:32px 48px;border-radius:12px;box-shadow:0 2px 16px #0002;font-size:18px;color:#007bff;">
+                    后台Ping中，请稍后再刷新页面
+                </div>`;
+                document.body.appendChild(modal);
+            } else {
+                modal.style.display = 'flex';
+            }
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 3000);
+        }
+
+        function showIpAddressManagePage() {
+            console.log('showIpAddressManagePage called');
+            fetchIpAddrs();
+        }
+
+        window.showIpAddressManagePage = showIpAddressManagePage;
+
+        function showEditIpModal(ipObj) {
+            const modal = document.getElementById('editIpModal');
+            const content = modal.querySelector('.edit-modal-content');
+            const form = document.getElementById('editIpForm');
+            form.id.value = ipObj.id || '';
+            form.ip.value = ipObj.ip || '';
+            form.mac.value = ipObj.mac || '';
+            form.hostname.value = ipObj.hostname || '';
+            form.business.value = ipObj.business || '';
+            form.department.value = ipObj.department || '';
+            form.user.value = ipObj.user || '';
+            form.manual.value = ipObj.manual || '';
+            form.remark.value = ipObj.remark || '';
+            form.asset_number.value = ipObj.asset_number || '';
+            content.classList.remove('closing');
+            modal.classList.add('show');
+            setTimeout(() => {
+                content.classList.add('active');
+            }, 10);
+        }
+        function hideEditIpModal() {
+            const modal = document.getElementById('editIpModal');
+            const content = modal.querySelector('.edit-modal-content');
+            content.classList.remove('active');
+            content.classList.add('closing');
+            setTimeout(() => {
+                modal.classList.remove('show');
+                content.classList.remove('closing');
+            }, 500);
+        }
+        document.querySelector('#editIpModal .cancel-btn').onclick = hideEditIpModal;
+        document.getElementById('editIpModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) hideEditIpModal();
+        });
+
+        window.editIpAddr = function(id) {
+            const ipObj = ipAddrList.find(item => item.id === id);
+            if (ipObj) showEditIpModal(ipObj);
+        };
+
+        document.getElementById('editIpForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            fetch('/ip-addresses/' + fd.get('id'), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mac: fd.get('mac'),
+                    hostname: fd.get('hostname'),
+                    business: fd.get('business'),
+                    department: fd.get('department'),
+                    user: fd.get('user'),
+                    manual: fd.get('manual'),
+                    remark: fd.get('remark'),
+                    asset_number: fd.get('asset_number')
+                })
+            })
+            .then(res => res.json())
+            .then(result => {
+                if (result.success) {
+                    alert('保存成功');
+                    hideEditIpModal();
+                    fetchIpAddrs();
+                } else {
+                    alert(result.message || '保存失败');
+                }
+            })
+            .catch(() => alert('网络错误，保存失败'));
+        };
+    </script>
+</body>
+</html>

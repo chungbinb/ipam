@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>打印机管理</title>
+    <link rel="stylesheet" type="text/css" href="../public/css/Pagestyle.css">
+    <style>
+        html, body {
+            height: 100%;
+            width: 100vw;
+            min-width: 0;
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f8f9fa;
+            min-height: 100vh;
+            min-width: 0;
+            width: 100vw;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            padding: 40px;
+            width: 100vw;
+            max-width: 100vw;
+            margin: 0;
+            box-sizing: border-box;
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .printer-section { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px #0001; margin-bottom: 32px; padding: 32px 24px; }
+        .printer-section h2 { font-size: 1.3rem; color: #007bff; margin-bottom: 18px; }
+        .printer-actions { margin-bottom: 12px; display:flex; gap:12px; }
+        .printer-actions button { background: #007bff; color: #fff; border: none; padding: 8px 24px; border-radius: 6px; cursor: pointer; }
+        .printer-actions button.delete { background: #d9534f; }
+        .printer-actions button:hover { background: #0056b3; }
+        .printer-actions button.import, .printer-actions button.export { background: #43b1ea; }
+        .printer-actions button.export { background: #ff9800; }
+        /* 列表自适应布局 */
+        .table-scroll-x {
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            height: 0;
+            overflow-x: auto;
+            width: 100%;
+            position: relative;
+            margin-bottom: 0;
+        }
+        .table-scroll-y {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+            overflow-y: auto;
+            width: 100%;
+            max-height: none;
+            position: relative;
+        }
+        table.printer-table {
+            min-width: 1200px;
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+        }
+        table.printer-table th, table.printer-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+        }
+        table.printer-table tbody tr:nth-child(odd) { background: #e3eafc; }
+        table.printer-table tbody tr:nth-child(even) { background: #f2f4f7; }
+        table.printer-table tbody tr:hover { background: #b3e5fc !important; }
+        table.printer-table th {
+            background: #f4f6fa;
+            color: #2d3e50;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        table.printer-table th:last-child,
+        table.printer-table td.action-cell {
+            position: sticky;
+            right: 0;
+            z-index: 11;
+            border-left: 2px solid #f4f6fa !important;
+            background: linear-gradient(to right, #25d05b 0px, #fff 3px, #fff 100%);
+            text-align: center;
+            min-width: 120px;
+        }
+        table.printer-table th:last-child {
+            background: linear-gradient(to right, #25d05b 0px, #fff 3px, #fff 100%);
+            z-index: 12;
+            border-left: 2px solid #f4f6fa !important;
+            text-align: center;
+        }
+        table.printer-table td.action-cell {
+            text-align: center;
+            min-width: 120px;
+        }
+        .action-btn { background: none; border: none; color: #007bff; cursor: pointer; margin-right: 8px; }
+        .action-btn.delete { color: #d9534f; }
+        /* 弹窗样式 */
+        .modal-mask { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.18); z-index: 9999; }
+        .modal-mask.show { display: block; }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: #fff; padding: 32px 24px; border-radius: 10px; box-shadow: 0 2px 16px #0002; min-width: 260px; max-width: 400px; text-align: center; }
+        .modal-content h3 { margin-top:0; color:#2d3e50; }
+        .modal-content label { font-weight:500; color:#2d3e50; }
+        .modal-content input, .modal-content select { width: 100%; margin-bottom: 12px; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 15px; }
+        .modal-actions { text-align:right; margin-top:16px; }
+        .modal-actions button { margin-left:8px; padding:8px 24px; border-radius:6px; border:none; font-size:15px; cursor:pointer; background:#007bff; color:#fff; }
+        .modal-actions button.cancel { background:#6c757d; }
+        .modal-actions button.delete { background:#d9534f; }
+        .modal-actions button.delete:hover { background:#b52a1a; }
+        /* 新增/编辑抽屉样式 */
+        #printerDrawerMask {
+            display: none;
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.18);
+            z-index: 9999;
+        }
+        #printerDrawerContent {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 520px; /* 加宽抽屉窗口 */
+            height: 100vh;
+            background: #fff;
+            box-shadow: -2px 0 16px #0002;
+            padding: 0;
+            overflow-y: auto;
+            transition: transform 0.4s cubic-bezier(.4,0,.2,1);
+            transform: translateX(100%);
+            border-radius: 10px 0 0 10px;
+        }
+        #printerDrawerContent.active {
+            transform: translateX(0);
+        }
+        #printerDrawerContent form .form-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        #printerDrawerContent form .form-row label {
+            min-width: 80px;
+            font-weight: 500;
+            color: #2d3e50;
+            margin-bottom: 0;
+            display: block;
+            text-align: right;
+        }
+        #printerDrawerContent form .form-row select,
+        #printerDrawerContent form .form-row input {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            margin-bottom: 0;
+        }
+        #printerDrawerContent form .form-row input[name="asset_number"] {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        #printerDrawerContent form .form-row input[name="price"] {
+            width: 160px !important;
+            min-width: 100px;
+            flex: none;
+            display: inline-block;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        #printerDrawerContent form .form-row select[name="currency"] {
+            width: 160px !important; /* 币种选择框加宽 */
+            min-width: 120px;
+            flex: none;
+            display: inline-block;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        @media (max-width: 800px) {
+            .container { padding: 12px; }
+            .modal-content {
+                width: 98vw;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- <h1>打印机管理</h1> -->
+        <!-- 顶部统计卡片 -->
+        <div style="display:flex;gap:24px;margin-bottom:32px;">
+            <div class="stat-card" style="background:#007bff;">
+                <div id="printerTotalCount">0</div>
+                <div>总打印机数</div>
+            </div>
+            <div class="stat-card" style="background:#43b1ea;">
+                <div id="printerInUseCount">0</div>
+                <div>在用数量</div>
+            </div>
+            <div class="stat-card" style="background:#ff9800;">
+                <div id="printerRepairCount">0</div>
+                <div>维修数量</div>
+            </div>
+            <div class="stat-card" style="background:#6c757d;">
+                <div id="printerScrapCount">0</div>
+                <div>报废数量</div>
+            </div>
+        </div>
+        <!-- 查询表单 -->
+        <form id="printerSearchForm" style="margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap;">
+            <input type="text" name="department" placeholder="部门">
+            <input type="text" name="user" placeholder="使用人员">
+            <input type="text" name="brand" placeholder="品牌">
+            <input type="text" name="model" placeholder="型号">
+            <input type="text" name="asset_number" placeholder="资产编号">
+            <input type="text" name="status" placeholder="状态">
+            <button type="submit">查询</button>
+        </form>
+        <!-- 操作按钮 -->
+        <div class="printer-actions">
+            <button onclick="showPrinterModal()">新增</button>
+            <button id="batchDeletePrinterBtn" class="delete">批量删除</button>
+            <button class="import" id="importPrinterBtn">导入</button>
+            <button class="export" id="exportPrinterBtn">导出</button>
+        </div>
+        <!-- 列表自适应容器 -->
+        <div class="table-scroll-x">
+            <div class="table-scroll-y" id="printerTableScrollY">
+                <table class="printer-table" id="printerTable">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;text-align:center;">
+                                <input type="checkbox" id="selectAllPrinter" style="cursor:pointer;">
+                            </th>
+                            <th style="width:60px;">序号</th>
+                            <th>部门</th>
+                            <th>使用人员</th>
+                            <th>品牌</th>
+                            <th>型号</th>
+                            <th>颜色</th>
+                            <th>类型</th>
+                            <th>功能</th>
+                            <th>资产编号</th>
+                            <th>状态</th>
+                            <th>更新时间</th>
+                            <th>购入价</th>
+                            <th>币种</th>
+                            <th style="min-width:120px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="printerTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        <!-- 新增/编辑抽屉弹窗 -->
+        <div id="printerDrawerMask">
+            <div id="printerDrawerContent">
+                <div style="padding:32px 24px;">
+                    <h3 id="printerDrawerTitle" style="margin-top:0;color:#2d3e50;font-size:22px;font-weight:bold;margin-bottom:24px;">新增打印机</h3>
+                    <form id="printerDrawerForm" style="display:flex;flex-direction:column;gap:0;">
+                        <input type="hidden" name="id">
+                        <div class="form-row">
+                            <label>部门 <span style="color:red">*</span></label>
+                            <select name="department" id="printerDepartmentSelect" required>
+                                <option value="">请选择部门</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>使用人员 <span style="color:red">*</span></label>
+                            <input type="text" name="user" required placeholder="请输入使用人员">
+                        </div>
+                        <div class="form-row">
+                            <label>品牌 <span style="color:red">*</span></label>
+                            <select name="brand" id="printerBrandSelect" required>
+                                <option value="">请选择品牌</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>型号</label>
+                            <input type="text" name="model" placeholder="型号">
+                        </div>
+                        <div class="form-row">
+                            <label>颜色 <span style="color:red">*</span></label>
+                            <select name="color" required>
+                                <option value="">请选择颜色</option>
+                                <option value="黑色">黑色</option>
+                                <option value="彩色">彩色</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>类型 <span style="color:red">*</span></label>
+                            <select name="type" required>
+                                <option value="">请选择类型</option>
+                                <option value="激光">激光</option>
+                                <option value="喷墨">喷墨</option>
+                                <option value="针式">针式</option>
+                                <option value="热敏">热敏</option>
+                                <option value="扫描仪">扫描仪</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>功能 <span style="color:red">*</span></label>
+                            <select name="function" required>
+                                <option value="">请选择功能</option>
+                                <option value="打印">打印</option>
+                                <option value="复印">复印</option>
+                                <option value="扫描">扫描</option>
+                                <option value="多功能一体机">多功能一体机</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>资产编号 <span style="color:red">*</span></label>
+                            <span style="flex:0 0 auto;">Print-</span>
+                            <input type="text" name="asset_number_suffix" id="printerAssetNumberSuffix" maxlength="4" placeholder="0001" pattern="\d{1,4}" style="width:100px;flex:0 0 100px;" required>
+                        </div>
+                        <div class="form-row">
+                            <label>状态 <span style="color:red">*</span></label>
+                            <select name="status" required>
+                                <option value="">请选择状态</option>
+                                <option value="在用">在用</option>
+                                <option value="维修中">维修中</option>
+                                <option value="未用">未用</option>
+                                <option value="报废">报废</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>购入价</label>
+                            <input type="number" name="price" placeholder="购入价">
+                            <select name="currency" id="printerCurrencySelect">
+                                <option value="CNY">人民币(CNY) ￥</option>
+                                <option value="THB">泰铢(THB) ฿</option>
+                                <option value="USD">美元(USD) $</option>
+                                <option value="EUR">欧元(EUR) €</option>
+                                <option value="JPY">日元(JPY) ¥</option>
+                                <option value="HKD">港币(HKD) HK$</option>
+                            </select>
+                        </div>
+                        <div class="modal-actions" style="margin-top:24px;text-align:right;">
+                            <button type="button" class="cancel" id="printerDrawerCancelBtn" style="background:#6c757d;">取消</button>
+                            <button type="submit" id="printerDrawerOkBtn" style="background:#007bff;">确定</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <!-- 删除弹窗 -->
+        <div id="deletePrinterModal" class="modal-mask">
+            <div class="modal-content">
+                <div style="font-size:18px;margin-bottom:24px;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <span style="font-size:24px;color:#ffc107;">&#9888;</span>
+                    <span id="deletePrinterModalText" style="color:#d9534f;">确定要删除该打印机吗？</span>
+                </div>
+                <div class="modal-actions" style="text-align:center;display:flex;justify-content:center;gap:16px;margin-top:16px;">
+                    <button class="cancel" id="deletePrinterModalCancelBtn">取消</button>
+                    <button class="delete" id="deletePrinterModalOkBtn">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 打印机数据缓存
+        let printerList = [];
+        let currentEditId = null;
+        let currentDeleteId = null;
+
+        // 渲染统计卡片
+        function renderPrinterStats() {
+            document.getElementById('printerTotalCount').innerText = printerList.length;
+            document.getElementById('printerInUseCount').innerText = printerList.filter(x => x.status === '在用').length;
+            document.getElementById('printerRepairCount').innerText = printerList.filter(x => x.status === '维修').length;
+            document.getElementById('printerScrapCount').innerText = printerList.filter(x => x.status === '报废').length;
+        }
+
+        // 渲染表格
+        function renderPrinterTable() {
+            const tbody = document.getElementById('printerTableBody');
+            tbody.innerHTML = '';
+            printerList.forEach((item, idx) => {
+                // 格式化更新时间只显示年月日
+                let updatedAt = item.updated_at || '';
+                if (updatedAt) {
+                    let d = new Date(updatedAt);
+                    if (!isNaN(d.getTime())) {
+                        let y = d.getFullYear();
+                        let m = d.getMonth() + 1;
+                        let day = d.getDate();
+                        updatedAt = `${y}/${m}/${day}`;
+                    }
+                }
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="rowPrinterCheckbox" data-id="${item.id}" style="cursor:pointer;">
+                    </td>
+                    <td>${idx + 1}</td>
+                    <td>${item.department || ''}</td>
+                    <td>${item.user || ''}</td>
+                    <td>${item.brand || ''}</td>
+                    <td>${item.model || ''}</td>
+                    <td>${item.color || ''}</td>
+                    <td>${item.type || ''}</td>
+                    <td>${item.function || ''}</td>
+                    <td>${item.asset_number || ''}</td>
+                    <td>${item.status || ''}</td>
+                    <td>${updatedAt}</td>
+                    <td>${item.price || ''}</td>
+                    <td>${item.currency || ''}</td>
+                    <td class="action-cell">
+                        <button class="action-btn" onclick="showPrinterModal(${item.id}, '${item.department}', '${item.user}', '${item.brand}', '${item.model}', '${item.color}', '${item.type}', '${item.function}', '${item.asset_number}', '${item.status}', '${item.price}', '${item.currency}')">
+                            <span style="display:inline-block;vertical-align:middle;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <path d="M4 13.5V16h2.5l9-9-2.5-2.5-9 9z" stroke="#007bff" stroke-width="2" fill="none"/>
+                                    <path d="M13.5 6.5l2 2" stroke="#007bff" stroke-width="2" fill="none"/>
+                                </svg>
+                            </span>
+                            编辑
+                        </button>
+                        <button class="action-btn delete" onclick="showDeletePrinterModal(${item.id}, '${item.brand}')">
+                            <span style="display:inline-block;vertical-align:middle;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <rect x="5" y="7" width="10" height="8" rx="2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                    <path d="M7 7V5a3 3 0 0 1 6 0v2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                    <line x1="8" y1="10" x2="8" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                    <line x1="12" y1="10" x2="12" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            删除
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 绑定全选
+            const selectAll = document.getElementById('selectAllPrinter');
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.onclick = function() {
+                    const checked = this.checked;
+                    document.querySelectorAll('.rowPrinterCheckbox').forEach(cb => { cb.checked = checked; });
+                };
+            }
+            document.querySelectorAll('.rowPrinterCheckbox').forEach(cb => {
+                cb.onclick = function() {
+                    const all = document.querySelectorAll('.rowPrinterCheckbox');
+                    const allChecked = Array.from(all).every(x => x.checked);
+                    if (selectAll) selectAll.checked = allChecked;
+                };
+            });
+        }
+
+        // 获取打印机数据（后端API）
+        function fetchPrinterList() {
+            fetch('../api/printer')
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        printerList = res.data;
+                        renderPrinterTable();
+                        renderPrinterStats();
+                    } else {
+                        printerList = [];
+                        renderPrinterTable();
+                        renderPrinterStats();
+                    }
+                });
+        }
+
+        // 查询表单
+        document.getElementById('printerSearchForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            let filtered = printerList.filter(item => {
+                return (!fd.get('department') || (item.department || '').includes(fd.get('department')))
+                    && (!fd.get('user') || (item.user || '').includes(fd.get('user')))
+                    && (!fd.get('brand') || (item.brand || '').includes(fd.get('brand')))
+                    && (!fd.get('model') || (item.model || '').includes(fd.get('model')))
+                    && (!fd.get('asset_number') || (item.asset_number || '').includes(fd.get('asset_number')))
+                    && (!fd.get('status') || (item.status || '').includes(fd.get('status')));
+            });
+            printerList = filtered;
+            renderPrinterTable();
+            renderPrinterStats();
+        };
+
+        // 拉取部门和品牌列表
+        function fetchPrinterDepartments(selectedValue) {
+            fetch('../api/department')
+                .then(res => res.json())
+                .then(res => {
+                    const select = document.getElementById('printerDepartmentSelect');
+                    select.innerHTML = '<option value="">请选择部门</option>';
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        res.data.forEach(dep => {
+                            select.innerHTML += `<option value="${dep.name}">${dep.name}</option>`;
+                        });
+                    }
+                    if (selectedValue) select.value = selectedValue;
+                });
+        }
+        function fetchPrinterBrands(selectedValue) {
+            fetch('../api/brand?type=consumable')
+                .then(res => res.json())
+                .then(res => {
+                    const select = document.getElementById('printerBrandSelect');
+                    select.innerHTML = '<option value="">请选择品牌</option>';
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        res.data.forEach(brand => {
+                            select.innerHTML += `<option value="${brand.name}">${brand.name}</option>`;
+                        });
+                    }
+                    if (selectedValue) select.value = selectedValue;
+                });
+        }
+        // 新增/编辑抽屉弹窗逻辑
+        window.showPrinterModal = function(id, department, user, brand, model, color, type, func, asset_number, status, price, currency) {
+            currentEditId = id || null;
+            document.getElementById('printerDrawerTitle').innerText = id ? '编辑打印机' : '新增打印机';
+            const form = document.getElementById('printerDrawerForm');
+            form.id.value = id || '';
+            form.user.value = user || '';
+            form.model.value = model || '';
+            form.color.value = color || '';
+            form.type.value = type || '';
+            form.function.value = func || '';
+            // 资产编号回显
+            if (asset_number && asset_number.startsWith('Print-')) {
+                form.asset_number_suffix.value = asset_number.slice(6);
+            } else {
+                form.asset_number_suffix.value = '';
+            }
+            form.status.value = status || '';
+            form.price.value = price || '';
+            document.getElementById('printerCurrencySelect').value = currency || 'CNY';
+            // 拉取部门和品牌
+            fetchPrinterDepartments(department);
+            fetchPrinterBrands(brand);
+            // 显示抽屉
+            const mask = document.getElementById('printerDrawerMask');
+            const content = document.getElementById('printerDrawerContent');
+            mask.style.display = 'block';
+            content.classList.remove('active');
+            setTimeout(() => {
+                content.classList.add('active');
+                content.style.transform = 'translateX(0)';
+            }, 10);
+        };
+        document.getElementById('printerDrawerCancelBtn').onclick = function() {
+            hidePrinterDrawer();
+        };
+        document.getElementById('printerDrawerMask').addEventListener('mousedown', function(e) {
+            if (e.target === this) hidePrinterDrawer();
+        });
+        function hidePrinterDrawer() {
+            const mask = document.getElementById('printerDrawerMask');
+            const content = document.getElementById('printerDrawerContent');
+            content.classList.remove('active');
+            content.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                mask.style.display = 'none';
+                document.getElementById('printerDrawerForm').reset();
+            }, 400);
+        }
+
+        // 新增/编辑提交（抽屉表单）
+        document.getElementById('printerDrawerForm').onsubmit = function(e) {
+            e.preventDefault();
+            const id = this.id.value;
+            const department = this.department.value;
+            const user = this.user.value.trim();
+            const brand = this.brand.value;
+            const model = this.model.value.trim();
+            const color = this.color.value.trim();
+            const type = this.type.value.trim();
+            const func = this.function.value.trim();
+            // 资产编号处理
+            let asset_number_suffix = this.asset_number_suffix.value.trim();
+            let asset_number = '';
+            if (asset_number_suffix) {
+                if (!/^\d{1,4}$/.test(asset_number_suffix)) {
+                    alert('资产编号后缀必须为1~4位数字');
+                    return;
+                }
+                asset_number = 'Print-' + asset_number_suffix.padStart(4, '0');
+            }
+            // 检查资产编号唯一性（前端校验，后端也应校验）
+            const isDuplicate = printerList.some(item =>
+                item.asset_number === asset_number && String(item.id) !== String(id)
+            );
+            if (asset_number && isDuplicate) {
+                alert('资产编号已存在，请更换');
+                return;
+            }
+            const status = this.status.value;
+            const price = this.price.value;
+            const currency = this.currency.value;
+            if (!department || !user || !brand) {
+                alert('部门、使用人员和品牌不能为空');
+                return;
+            }
+            if (!type) {
+                alert('类型不能为空');
+                return;
+            }
+            if (!func) {
+                alert('功能不能为空');
+                return;
+            }
+            if (!status) {
+                alert('状态不能为空');
+                return;
+            }
+            const payload = { department, user, brand, model, color, type, function: func, asset_number, status, price, currency };
+            if (id) {
+                // 编辑
+                fetch(`/api/printer/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(res => res.json()).then(res => {
+                    if (res.code === 0) {
+                        fetchPrinterList();
+                        hidePrinterDrawer();
+                    } else if (res.msg && res.msg.indexOf('资产编号已存在') !== -1) {
+                        alert('资产编号已存在，请更换');
+                    } else {
+                        alert('编辑失败');
+                    }
+                });
+            } else {
+                // 新增
+                fetch('../api/printer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(res => res.json()).then(res => {
+                    if (res.code === 0) {
+                        fetchPrinterList();
+                        hidePrinterDrawer();
+                    } else if (res.msg && res.msg.indexOf('资产编号已存在') !== -1) {
+                        alert('资产编号已存在，请更换');
+                    } else {
+                        alert('新增失败');
+                    }
+                });
+            }
+        };
+
+        // 删除弹窗逻辑
+        window.showDeletePrinterModal = function(id, brand) {
+            currentDeleteId = id;
+            document.getElementById('deletePrinterModalText').innerText = `确定要删除打印机：${brand} 吗？`;
+            document.getElementById('deletePrinterModal').classList.add('show');
+        };
+        document.getElementById('deletePrinterModalCancelBtn').onclick = function() {
+            document.getElementById('deletePrinterModal').classList.remove('show');
+        };
+        document.getElementById('deletePrinterModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) this.classList.remove('show');
+        });
+        document.getElementById('deletePrinterModalOkBtn').onclick = function() {
+            const id = currentDeleteId;
+            fetch(`/api/printer/${id}`, { method: 'DELETE' })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        fetchPrinterList();
+                        document.getElementById('deletePrinterModal').classList.remove('show');
+                    } else {
+                        alert('删除失败');
+                    }
+                });
+        };
+
+        // 批量删除
+        document.getElementById('batchDeletePrinterBtn').onclick = function() {
+            const checkedBoxes = Array.from(document.querySelectorAll('.rowPrinterCheckbox')).filter(cb => cb.checked);
+            if (checkedBoxes.length === 0) {
+                alert('请先选择要删除的打印机');
+                return;
+            }
+            if (!confirm(`确定要删除选中的${checkedBoxes.length}项吗？`)) return;
+            const ids = checkedBoxes.map(cb => cb.getAttribute('data-id'));
+            fetch('../api/printer/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids })
+            }).then(res => res.json()).then(res => {
+                if (res.code === 0) {
+                    fetchPrinterList();
+                } else {
+                    alert('批量删除失败');
+                }
+            });
+        };
+
+        // 导入/导出按钮
+        document.getElementById('importPrinterBtn').onclick = function() {
+            // 创建文件选择框
+            let input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.xlsx,.xls';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (typeof XLSX === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+                    script.onload = function() {
+                        handleImportPrinterFile(file);
+                    };
+                    document.body.appendChild(script);
+                } else {
+                    handleImportPrinterFile(file);
+                }
+            };
+            input.click();
+        };
+
+        function handleImportPrinterFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+                if (!json.length) {
+                    alert('表格无数据');
+                    return;
+                }
+                // 字段映射（表头名称到数据库字段）
+                const fieldMap = {
+                    '部门': 'department',
+                    '使用人员': 'user',
+                    '品牌': 'brand',
+                    '型号': 'model',
+                    '颜色': 'color',
+                    '类型': 'type',
+                    '功能': 'function',
+                    '资产编号': 'asset_number',
+                    '状态': 'status',
+                    '购入价': 'price',
+                    '币种': 'currency',
+                    '更新时间': 'updated_at'
+                };
+                // 转换为后端字段
+                const importData = json.map((row, idx) => {
+                    let obj = {};
+                    Object.keys(fieldMap).forEach(k => {
+                        if (row[k] !== undefined) obj[fieldMap[k]] = row[k];
+                    });
+                    // 调试输出原始更新时间
+                    if (obj.updated_at !== undefined) {
+                        console.log(`第${idx + 2}行原始更新时间:`, obj.updated_at);
+                    }
+                    // 处理更新时间（只保留年月日，支持Excel日期序列号和字符串）
+                    if (obj.updated_at) {
+                        let val = obj.updated_at;
+                        let d;
+                        if (/^\d+(\.\d+)?$/.test(val)) {
+                            // Excel序列号转日期
+                            d = new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(val)) * 86400000);
+                        } else {
+                            d = new Date(val);
+                        }
+                        if (!isNaN(d.getTime())) {
+                            let y = d.getFullYear();
+                            let m = d.getMonth() + 1;
+                            let day = d.getDate();
+                            obj.updated_at = `${y}/${m}/${day}`;
+                        }
+                        // 调试输出转换后的更新时间
+                        console.log(`第${idx + 2}行转换后更新时间:`, obj.updated_at);
+                    }
+                    return obj;
+                });
+                // 批量导入（逐条POST，或可改为后端批量接口）
+                let successCount = 0;
+                let failCount = 0;
+                let total = importData.length;
+                let finished = 0;
+                importData.forEach(item => {
+                    fetch('../api/printer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(item)
+                    })
+                    .then(res => res.json())
+                    .then(res => {
+                        finished++;
+                        if (res.code === 0) successCount++;
+                        else failCount++;
+                        if (finished === total) {
+                            alert(`导入完成：成功${successCount}条，失败${failCount}条`);
+                            fetchPrinterList();
+                        }
+                    })
+                    .catch(() => {
+                        finished++;
+                        failCount++;
+                        if (finished === total) {
+                            alert(`导入完成：成功${successCount}条，失败${failCount}条`);
+                            fetchPrinterList();
+                        }
+                    });
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        document.getElementById('exportPrinterBtn').onclick = function() {
+            const checkedBoxes = Array.from(document.querySelectorAll('.rowPrinterCheckbox')).filter(cb => cb.checked);
+            if (checkedBoxes.length === 0) {
+                alert('请先选择要导出的打印机');
+                return;
+            }
+            const ids = checkedBoxes.map(cb => cb.getAttribute('data-id'));
+            const exportData = printerList.filter(item => ids.includes(String(item.id)));
+            if (!exportData.length) {
+                alert('没有可导出的数据');
+                return;
+            }
+            // 表头
+            const headers = [
+                '部门','使用人员','品牌','型号','颜色','类型','功能','资产编号','状态','更新时间','购入价','币种'
+            ];
+            const rows = [headers];
+            exportData.forEach(row => {
+                rows.push([
+                    row.department || '',
+                    row.user || '',
+                    row.brand || '',
+                    row.model || '',
+                    row.color || '',
+                    row.type || '',
+                    row.function || '',
+                    row.asset_number || '',
+                    row.status || '',
+                    row.updated_at || '',
+                    row.price || '',
+                    row.currency || ''
+                ]);
+            });
+            if (typeof XLSX === 'undefined') {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+                script.onload = function() {
+                    exportPrinterTableXlsx(rows);
+                };
+                document.body.appendChild(script);
+            } else {
+                exportPrinterTableXlsx(rows);
+            }
+        };
+
+        function exportPrinterTableXlsx(rows) {
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '打印机管理');
+            XLSX.writeFile(wb, '打印机导出.xlsx');
+        }
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchPrinterList();
+        });
+    </script>
+</body>
+</html>

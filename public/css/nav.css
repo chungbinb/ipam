@@ -1,0 +1,252 @@
+@charset "utf-8";
+
+/* 以下实际使用若已初始化可删除 .nav height父级需逐级设置为100%*/
+body,
+html {
+    height: 100%;
+    background: #E2E2E2
+}
+
+body,
+ul {
+    margin: 0;
+    padding: 0
+}
+
+body {
+    font: 14px "微软雅黑", "宋体", "Arial Narrow", HELVETICA;
+    -webkit-text-size-adjust: 100%;
+}
+
+li {
+    list-style: none
+}
+
+a {
+    text-decoration: none;
+}
+
+/* 以上实际使用若已初始化可删除 */
+
+/* nav */
+.nav {
+    width: 220px;
+    height: 100%;
+    background: #001529;
+    transition: all .3s;
+}
+.nav.nav-mini {
+    width: 60px;
+}
+
+.nav a {
+    display: block;
+    overflow: hidden;
+    padding-left: 20px;
+    line-height: 46px;
+    max-height: 46px;
+    color: #ABB1B7;
+    transition: all .3s;
+}
+
+.nav a span {
+    margin-left: 30px;
+}
+
+.nav-item {
+    position: relative;
+}
+
+.nav-item.nav-show {
+    border-bottom: none;
+}
+
+.nav-item ul {
+    display: none;
+    background: rgba(0, 0, 0, .1);
+}
+
+.nav-item.nav-show ul {
+    display: block;
+}
+
+.nav-item>a:before {
+    content: "";
+    position: absolute;
+    left: 0px;
+    width: 2px;
+    height: 46px;
+    background: #25d05b;
+    opacity: 0;
+    transition: all .3s;
+}
+
+.nav .nav-icon {
+    /* 一级菜单图标样式 */
+    font-size: 20px;
+    /* 移除 position:absolute; 和 margin-left:-1px; */
+}
+
+.nav-item > a > .nav-icon {
+    /* 一级菜单图标定位，左侧对齐，垂直居中 */
+    position: static;
+    top: 0;
+    margin-right: 0px;
+    margin-left: 0;
+    vertical-align: middle;
+}
+
+.nav-item ul .nav-icon {
+    /* 二级菜单图标定位，右移一点 */
+    position: static;
+    top: 0;
+    margin-right: 0px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* 此处修改导航图标 可自定义iconfont 替换*/
+.icon_1::after {
+    content: "\e62b";
+}
+
+.icon_2::after {
+    content: "\e669";
+}
+
+.icon_3::after {
+    content: "\e61d";
+}
+
+/*---------------------*/
+.nav-more {
+    float: right;
+    margin-right: 20px;
+    font-size: 12px;
+    transition: transform .3s;
+}
+
+/* 此处为导航右侧箭头 如果自定义iconfont 也需要替换*/
+.nav-more::after {
+    content: "\e621";
+}
+
+/*---------------------*/
+.nav-show .nav-more {
+    transform: rotate(90deg);
+}
+
+.nav-show,
+.nav-item>a:hover {
+    color: #FFF;
+    /* background: rgba(0, 0, 0, .1); */
+    background: #0b55a4;
+}
+
+.nav-show>a:before,
+.nav-item>a:hover:before {
+    opacity: 1;
+}
+
+.nav-item li:hover a {
+    color: #FFF;
+    /* background: rgba(0, 0, 0, .1); */
+    background: #0b55a4;
+}
+
+/* nav-mini */
+.nav-mini.nav {
+    width: 60px;
+}
+
+.nav-mini.nav .nav-icon {
+    /* margin-left:-2px; */
+}
+
+.nav-mini.nav .nav-item>a span {
+    display: none;
+}
+
+.nav-mini.nav .nav-more {
+    margin-right: -20px;
+}
+
+.nav-mini.nav .nav-item ul {
+    position: absolute;
+    top: 0px;
+    left: 60px;
+    width: 180px;
+    z-index: 99;
+    background: #3C474C;
+    overflow: hidden;
+}
+
+.nav-mini.nav .nav-item:hover {
+    background: rgba(255, 255, 255, .1);
+}
+
+.nav-mini.nav .nav-item:hover .nav-item a {
+    color: #FFF;
+}
+
+.nav-mini.nav .nav-item:hover a:before {
+    opacity: 1;
+}
+
+.nav-mini.nav .nav-item:hover ul {
+    display: block;
+}
+
+/* index.html中的样式迁移 */
+.content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    padding: 24px 24px 0 24px; /* 去掉底部padding，只保留左右和顶部 */
+    background: #f8f9fa;
+    margin-left: 220px;
+    transition: margin-left 0.2s;
+}
+.content.content-mini {
+    margin-left: 60px;
+}
+.content h1, .content p {
+    margin: 0 0 16px 0;
+}
+#mainFrame {
+    width: 100%;
+    height: calc(100vh - 60px);
+    border: none;
+    background: #fff;
+    box-shadow: 0 2px 8px #0001;
+}
+
+/* 保持导航图标样式 */
+.nav-icon {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    vertical-align: middle;
+}
+
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f4f6fa;
+    box-shadow: 0 2px 8px #0001;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+    /* 修复底部遮罩问题：移除高度撑满和透明背景 */
+    box-sizing: border-box;
+}

@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>笔记本管理</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f8f9fa; }
+        .container {
+            padding: 40px;
+            /* max-width: 1200px; */
+            margin: 0 auto;
+            width: 100vw;
+            max-width: 100vw;
+            min-width: 800px;
+            box-sizing: border-box;
+        }
+        h1 { font-size: 2rem; color: #2d3e50; margin-bottom: 32px; }
+        .stat-card {
+            flex:1;
+            padding:24px;
+            border-radius:10px;
+            box-shadow:0 2px 8px #0001;
+            text-align:center;
+            background: #3f51b5;
+            color: #fff;
+            border: none;
+        }
+        .stat-card div:first-child {
+            font-size:32px;
+            font-weight:bold;
+            color:#fff;
+        }
+        .stat-card div:last-child {
+            color:#fff;
+            margin-top:8px;
+        }
+        .stat-card.wenzhou div:first-child,
+        .stat-card.wenzhou div:last-child,
+        .stat-card.chuzhou div:first-child,
+        .stat-card.chuzhou div:last-child,
+        .stat-card.thailand div:first-child,
+        .stat-card.thailand div:last-child {
+            color: #fff;
+        }
+        form { margin-bottom: 20px; }
+        input, select, button { margin-right: 8px; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 15px; }
+        input:focus, select:focus { border-color: #43b1ea; outline: none; }
+        button { background: #43b1ea; color: #fff; border: none; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #007bff; }
+        .table-scroll-x { overflow-x: auto; width: 100%; position: relative; margin-bottom: 0; }
+        .table-scroll-y { max-height: 420px; overflow-y: auto; width: 100%; position: relative; }
+        table.laptop-table {
+            min-width: 1100px;
+            width: 100%; /* 让表格宽度自适应父容器 */
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+        }
+        table.laptop-table th, table.laptop-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+            background: #fff;
+        }
+        table.laptop-table th {
+            background: #f4f6fa;
+            color: #2d3e50;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        table.laptop-table th:last-child,
+        table.laptop-table td.laptop-action-cell {
+            position: sticky;
+            right: 0;
+            z-index: 11;
+            border-left: none !important;
+            box-shadow: none;
+            background: linear-gradient(to right, #43b1ea 0px, #fff 3px, #fff 6px);
+            text-align: center;
+            min-width: 56px;
+            width: 56px;
+        }
+        .laptop-action-cell button {
+            background: none !important;
+            border: none;
+            box-shadow: none;
+        }
+        #drawerContent {
+            transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+            transform: translateX(100%);
+        }
+        #drawerMask.show #drawerContent {
+            transform: translateX(0);
+        }
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            margin-bottom: 0;
+            background: none;
+            box-shadow: none;
+            border-radius: 0;
+            padding: 0;
+            max-width: none;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .pagination-bar .page-btn {
+            min-width: 32px;
+            padding: 2px 8px;
+            border: 1px solid #e0e0e0;
+            background: #fff;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .pagination-bar .page-btn.active {
+            background: #007bff;
+            color: #fff;
+            font-weight: bold;
+            border-color: #007bff;
+        }
+        .pagination-bar .page-btn:disabled {
+            color: #aaa;
+            background: #f4f6fa;
+            cursor: not-allowed;
+        }
+        .pagination-bar .jump-input {
+            width: 48px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 15px;
+            margin-left: 8px;
+        }
+        .pagination-bar .jump-btn {
+            padding: 2px 10px;
+            border-radius: 4px;
+            border: none;
+            background: #007bff;
+            color: #fff;
+            margin-left: 2px;
+            cursor: pointer;
+        }
+        .pagination-bar .jump-btn:hover {
+            background: #0056b3;
+        }
+        @media (max-width: 1200px) {
+            .container { padding: 12px; }
+            table.laptop-table { min-width: 900px; }
+        }
+        @media (max-width: 800px) {
+            .container { padding: 4px; }
+            table.laptop-table { min-width: 600px; }
+        }
+    </style>
+    <script src="../public/js/jquery.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部统计卡片 -->
+        <div style="display:flex;gap:24px;margin-bottom:32px;">
+            <div class="stat-card">
+                <div id="laptopTotal">0</div>
+                <div>笔记本总数量</div>
+            </div>
+            <div class="stat-card wenzhou">
+                <div id="laptopWenzhou">0</div>
+                <div>温州数量</div>
+            </div>
+            <div class="stat-card chuzhou">
+                <div id="laptopChuzhou">0</div>
+                <div>滁州数量</div>
+            </div>
+            <div class="stat-card thailand">
+                <div id="laptopThailand">0</div>
+                <div>泰国数量</div>
+            </div>
+        </div>
+        <!-- 查询表单 -->
+        <form id="laptopSearchForm" style="margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap;">
+            <input type="text" name="name" placeholder="名称">
+            <input type="text" name="ip" placeholder="IP地址">
+            <input type="text" name="assetId" placeholder="资产编号(支持模糊)">
+            <select name="currency">
+                <option value="">全部币种</option>
+                <option value="CNY">人民币(CNY) ￥</option>
+                <option value="THB">泰铢(THB) ฿</option>
+                <option value="USD">美元(USD) $</option>
+                <option value="EUR">欧元(EUR) €</option>
+                <option value="JPY">日元(JPY) ¥</option>
+                <option value="HKD">港币(HKD) HK$</option>
+                <option value="GBP">英镑(GBP) £</option>
+                <!-- 可根据需要继续补充 -->
+            </select>
+            <input type="number" name="valueMin" placeholder="价值最小" min="0" style="width:100px;">
+            <input type="number" name="valueMax" placeholder="价值最大" min="0" style="width:100px;">
+            <input type="text" name="region" placeholder="所在地区">
+            <input type="text" name="department" placeholder="部门">
+            <input type="text" name="user" placeholder="使用人">
+            <select name="status">
+                <option value="">全部状态</option>
+                <option value="在用">在用</option>
+                <option value="闲置">闲置</option>
+                <option value="维修">维修</option>
+            </select>
+            <button type="submit">查询</button>
+        </form>
+        <!-- 新增按钮和批量删除按钮 -->
+        <div style="margin-bottom:12px;display:flex;gap:12px;">
+            <button id="addLaptopBtn" style="background:#007bff;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">新增笔记本</button>
+            <button id="batchDeleteBtn" style="background:#d9534f;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">批量删除</button>
+        </div>
+        <!-- 笔记本列表 -->
+        <div class="table-scroll-x">
+            <div class="table-scroll-y" id="laptopTableScrollY">
+                <table class="laptop-table" id="laptopTable">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;text-align:center;">
+                                <input type="checkbox" id="selectAllLaptop" style="cursor:pointer;">
+                            </th>
+                            <th>序号</th>
+                            <th>名称</th>
+                            <th>IP地址</th>
+                            <th>资产编号</th>
+                            <th>资产价值</th>
+                            <th>币种</th>
+                            <th>取得日期</th>
+                            <th>所在地区</th>
+                            <th>部门</th>
+                            <th>使用人</th>
+                            <th>状态</th>
+                            <th>备注</th>
+                            <th style="min-width:56px;width:56px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="laptopTableBody">
+                        <!-- 数据行由JS渲染 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- 分页控件和页大小选择 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;">
+            <div>
+                每页
+                <select id="laptopPageSizeSelect" style="padding:4px 12px;">
+                    <option value="10">10行</option>
+                    <option value="20" selected>20行</option>
+                    <option value="50">50行</option>
+                </select>
+            </div>
+            <div id="laptopPaginationBar" class="pagination-bar"></div>
+        </div>
+        <!-- 新增弹窗（右侧抽屉） -->
+        <div id="drawerMask" style="display:none;position:fixed;top:0;right:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;">
+            <div id="drawerContent"
+                style="position:absolute;top:0;right:0;width:400px;height:100vh;background:#fff;box-shadow:-2px 0 16px #0002;padding:32px 24px;overflow-y:auto;transition:transform 0.4s cubic-bezier(.4,0,.2,1);transform:translateX(100%);">
+                <div style="font-size:20px;font-weight:bold;color:#3f51b5;margin-bottom:24px;">新增笔记本</div>
+                <form id="addLaptopForm" style="display:flex;flex-direction:column;gap:16px;">
+                    <label style="color:#3f51b5;font-weight:500;">
+                        <span style="color:red;">*</span> 名称
+                    </label>
+                    <input type="text" name="name" placeholder="名称" required>
+                    <label style="color:#3f51b5;font-weight:500;">
+                        IP地址
+                    </label>
+                    <input type="text" name="ip" placeholder="IP地址">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">
+                            <span style="color:red;">*</span> 资产编号：
+                        </label>
+                        <span style="margin-right:6px;">PC-</span>
+                        <select name="assetPrefix" required style="width:60px;">
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="X">X</option>
+                        </select>
+                        <input type="text" name="assetNumber" maxlength="4" pattern="\d{4}" required placeholder="四位数字" style="width:80px;margin-left:8px;">
+                    </div>
+                    <label style="color:#3f51b5;font-weight:500;">资产价值</label>
+                    <input type="number" name="value" placeholder="资产价值" min="0" style="flex:1;">
+                    <label style="color:#3f51b5;font-weight:500;">币种</label>
+                    <select name="currency" style="flex:1;">
+                        <option value="">请选择币种</option>
+                        <option value="CNY">人民币(CNY) ￥</option>
+                        <option value="THB">泰铢(THB) ฿</option>
+                        <option value="USD">美元(USD) $</option>
+                        <option value="EUR">欧元(EUR) €</option>
+                        <option value="JPY">日元(JPY) ¥</option>
+                        <option value="HKD">港币(HKD) HK$</option>
+                        <option value="GBP">英镑(GBP) £</option>
+                    </select>
+                    <label style="color:#3f51b5;font-weight:500;">取得日期</label>
+                    <input type="date" name="acquireDate" style="flex:1;">
+                    <label style="color:#3f51b5;font-weight:500;">所在地区</label>
+                    <select name="region" required>
+                        <option value="温州">温州</option>
+                        <option value="滁州">滁州</option>
+                        <option value="泰国">泰国</option>
+                    </select>
+                    <label style="color:#3f51b5;font-weight:500;">部门</label>
+                    <input type="text" name="department" placeholder="部门">
+                    <label style="color:#3f51b5;font-weight:500;">使用人</label>
+                    <input type="text" name="user" placeholder="使用人">
+                    <label style="color:#3f51b5;font-weight:500;">状态</label>
+                    <select name="status">
+                        <option value="">请选择状态</option>
+                        <option value="在用">在用</option>
+                        <option value="闲置">闲置</option>
+                        <option value="维修">维修</option>
+                    </select>
+                    <label style="color:#3f51b5;font-weight:500;">备注</label>
+                    <input type="text" name="remark" placeholder="备注">
+                    <div style="display:flex;gap:16px;justify-content:flex-end;">
+                        <button type="button" id="drawerCancelBtn" style="background:#6c757d;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">取消</button>
+                        <button type="submit" id="drawerOkBtn" style="background:#007bff;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">确定</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 编辑弹窗（右侧抽屉） -->
+        <div id="editDrawerMask" style="display:none;position:fixed;top:0;right:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;">
+            <div id="editDrawerContent"
+                style="position:absolute;top:0;right:0;width:400px;height:100vh;background:#fff;box-shadow:-2px 0 16px #0002;padding:32px 24px;overflow-y:auto;transition:transform 0.4s cubic-bezier(.4,0,.2,1);transform:translateX(100%);">
+                <div style="font-size:20px;font-weight:bold;color:#3f51b5;margin-bottom:24px;">编辑笔记本</div>
+                <form id="editLaptopForm" style="display:flex;flex-direction:column;gap:16px;">
+                    <input type="hidden" name="id">
+                    <label style="color:#3f51b5;font-weight:500;">
+                        <span style="color:red;">*</span> 名称
+                    </label>
+                    <input type="text" name="name" placeholder="名称" required>
+                    <label style="color:#3f51b5;font-weight:500;">
+                        IP地址
+                    </label>
+                    <input type="text" name="ip" placeholder="IP地址">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">
+                            <span style="color:red;">*</span> 资产编号：
+                        </label>
+                        <span style="margin-right:6px;">PC-</span>
+                        <select name="assetPrefix" required style="width:60px;">
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="X">X</option>
+                        </select>
+                        <input type="text" name="assetNumber" maxlength="4" pattern="\d{4}" required placeholder="四位数字" style="width:80px;margin-left:8px;">
+                    </div>
+                    <label style="color:#3f51b5;font-weight:500;">资产价值</label>
+                    <input type="number" name="value" placeholder="资产价值" min="0" style="flex:1;">
+                    <label style="color:#3f51b5;font-weight:500;">币种</label>
+                    <select name="currency" style="flex:1;">
+                        <option value="">请选择币种</option>
+                        <option value="CNY">人民币(CNY) ￥</option>
+                        <option value="THB">泰铢(THB) ฿</option>
+                        <option value="USD">美元(USD) $</option>
+                        <option value="EUR">欧元(EUR) €</option>
+                        <option value="JPY">日元(JPY) ¥</option>
+                        <option value="HKD">港币(HKD) HK$</option>
+                        <option value="GBP">英镑(GBP) £</option>
+                    </select>
+                    <label style="color:#3f51b5;font-weight:500;">取得日期</label>
+                    <input type="date" name="acquireDate" style="flex:1;">
+                    <label style="color:#3f51b5;font-weight:500;">所在地区</label>
+                    <select name="region" required>
+                        <option value="温州">温州</option>
+                        <option value="滁州">滁州</option>
+                        <option value="泰国">泰国</option>
+                    </select>
+                    <label style="color:#3f51b5;font-weight:500;">部门</label>
+                    <input type="text" name="department" placeholder="部门">
+                    <label style="color:#3f51b5;font-weight:500;">使用人</label>
+                    <input type="text" name="user" placeholder="使用人">
+                    <label style="color:#3f51b5;font-weight:500;">状态</label>
+                    <select name="status">
+                        <option value="">请选择状态</option>
+                        <option value="在用">在用</option>
+                        <option value="闲置">闲置</option>
+                        <option value="维修">维修</option>
+                    </select>
+                    <label style="color:#3f51b5;font-weight:500;">备注</label>
+                    <input type="text" name="remark" placeholder="备注">
+                    <div style="display:flex;gap:16px;justify-content:flex-end;">
+                        <button type="button" id="editDrawerCancelBtn" style="background:#6c757d;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">取消</button>
+                        <button type="submit" id="editDrawerOkBtn" style="background:#007bff;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 新增成功弹窗 -->
+        <div id="successModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:2000;">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:40px 60px;border-radius:12px;box-shadow:0 2px 16px #0002;text-align:center;">
+                <div style="font-size:22px;color:#43ea7c;margin-bottom:18px;">新增成功</div>
+                <button id="successModalCloseBtn" style="padding:8px 32px;border-radius:6px;background:#007bff;color:#fff;border:none;font-size:16px;cursor:pointer;">确定</button>
+            </div>
+        </div>
+        <!-- 弹窗遮罩 -->
+        <div id="modalMask" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;">
+            <div id="modalContent" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:32px 24px;border-radius:10px;box-shadow:0 2px 16px #0002;min-width:260px;max-width:320px;text-align:center;">
+                <div id="modalText" style="font-size:18px;margin-bottom:24px;display:flex;align-items:center;justify-content:center;gap:8px;">
+                    <!-- 黄色警告图标和红色文本 -->
+                    <span style="font-size:24px;color:#ffc107;">&#9888;</span>
+                    <span id="modalTextContent" style="color:#d9534f;">确认删除：华硕 ？</span>
+                </div>
+                <div id="modalActions" style="display:flex;justify-content:center;gap:16px;">
+                    <button id="modalCancelBtn" style="background:#6c757d;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">取消</button>
+                    <button id="modalOkBtn" style="background:#d9534f;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 数据操作API地址
+        const API_BASE = '../api/laptop';
+
+        // 分页相关变量
+        let currentPage = 1;
+        let pageSize = 20; // 默认20行
+        let filteredList = [];
+
+        function renderLaptopTablePage() {
+            const total = filteredList.length;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            currentPage = Math.min(currentPage, totalPages);
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, total);
+            const pageData = filteredList.slice(startIdx, endIdx);
+
+            const tbody = document.getElementById('laptopTableBody');
+            tbody.innerHTML = '';
+            pageData.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="rowCheckbox" data-id="${item.id}" style="cursor:pointer;">
+                    </td>
+                    <td>${startIdx + idx + 1}</td>
+                    <td>${item.name}</td>
+                    <td>${item.ip}</td>
+                    <td>${item.asset_id || item.assetId || ''}</td>
+                    <td>${item.value || ''}</td>
+                    <td>${item.currency || ''}</td>
+                    <td>${item.acquire_date || item.acquireDate || ''}</td>
+                    <td>${item.region}</td>
+                    <td>${item.department}</td>
+                    <td>${item.user}</td>
+                    <td>${item.status}</td>
+                    <td>${item.remark}</td>
+                    <td class="laptop-action-cell">
+                        <button style="display:inline-flex;align-items:center;gap:4px;color:#007bff;" onclick='showEditDrawer(${JSON.stringify(item).replace(/"/g, "&quot;")})'>
+                            <span style="width:18px;height:18px;display:inline-block;color:#007bff;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <path d="M4 13.5V16h2.5l9-9-2.5-2.5-9 9z" stroke="#007bff" stroke-width="2" fill="none"/>
+                                    <path d="M13.5 6.5l2 2" stroke="#007bff" stroke-width="2" fill="none"/>
+                                </svg>
+                            </span>
+                            <span>编辑</span>
+                        </button>
+                        <button style="display:inline-flex;align-items:center;gap:4px;color:#007bff;" onclick="showModal('删除：${item.name}', function(){ deleteLaptop(item.id); })">
+                            <span style="width:18px;height:18px;display:inline-block;color:#007bff;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <rect x="5" y="7" width="10" height="8" rx="2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                    <path d="M7 7V5a3 3 0 0 1 6 0v2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                    <line x1="8" y1="10" x2="8" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                    <line x1="12" y1="10" x2="12" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            <span>删除</span>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 绑定全选和行选
+            document.getElementById('selectAllLaptop').onclick = function() {
+                const checked = this.checked;
+                document.querySelectorAll('.rowCheckbox').forEach(cb => { cb.checked = checked; });
+            };
+            document.querySelectorAll('.rowCheckbox').forEach(cb => {
+                cb.onclick = function() {
+                    const all = document.querySelectorAll('.rowCheckbox');
+                    const allChecked = Array.from(all).every(x => x.checked);
+                    document.getElementById('selectAllLaptop').checked = allChecked;
+                };
+            });
+
+            renderLaptopPaginationBar(totalPages);
+        }
+
+        function renderLaptopPaginationBar(totalPages) {
+            const bar = document.getElementById('laptopPaginationBar');
+            const total = filteredList.length;
+            if (totalPages <= 1) {
+                bar.innerHTML = `共 ${total} 条数据`;
+                return;
+            }
+            let html = `共 ${total} 条数据 `;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoLaptopPage(1)">首页</button>`;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoLaptopPage(${currentPage - 1})">上一页</button>`;
+            let pageBtns = [];
+            let maxShow = 7;
+            if (totalPages <= maxShow) {
+                for (let i = 1; i <= totalPages; i++) {
+                    pageBtns.push(i);
+                }
+            } else {
+                if (currentPage <= 4) {
+                    pageBtns = [1,2,3,4,5,'...',totalPages];
+                } else if (currentPage >= totalPages - 3) {
+                    pageBtns = [1,'...',totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages];
+                } else {
+                    pageBtns = [1,'...',currentPage-1,currentPage,currentPage+1,'...',totalPages];
+                }
+            }
+            pageBtns.forEach(p => {
+                if (p === '...') {
+                    html += `<span style="padding:0 4px;">...</span>`;
+                } else {
+                    html += `<button class="page-btn${p===currentPage?' active':''}" onclick="gotoLaptopPage(${p})">${p}</button>`;
+                }
+            });
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoLaptopPage(${currentPage + 1})">下一页</button>`;
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoLaptopPage(${totalPages})">末页</button>`;
+            html += `<span style="margin-left:8px;">跳至</span>
+                <input type="number" min="1" max="${totalPages}" id="laptopJumpPageInput" class="jump-input" value="${currentPage}">
+                <button class="jump-btn" onclick="laptopJumpToPage(${totalPages})">确定</button>`;
+            bar.innerHTML = html;
+            document.getElementById('laptopJumpPageInput').onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    laptopJumpToPage(totalPages);
+                }
+            };
+        }
+
+        window.gotoLaptopPage = function(page) {
+            page = Math.max(1, Math.min(page, Math.ceil(filteredList.length / pageSize)));
+            currentPage = page;
+            renderLaptopTablePage();
+        };
+
+        window.laptopJumpToPage = function(totalPages) {
+            const input = document.getElementById('laptopJumpPageInput');
+            let val = parseInt(input.value, 10);
+            if (!val || val < 1 || val > totalPages) return;
+            gotoLaptopPage(val);
+        };
+
+        // 页大小选择
+        document.getElementById('laptopPageSizeSelect').onchange = function() {
+            pageSize = parseInt(this.value, 10);
+            currentPage = 1;
+            renderLaptopTablePage();
+        };
+
+        // 查询数据并渲染
+        function fetchLaptopList(query = {}) {
+            $.get(API_BASE, query, function(res) {
+                // 调试输出
+                console.log('fetchLaptopList返回:', res);
+                // 兼容后端返回多次JSON（如 {"code":0,"data":[...]}{"code":0,"data":[...]})
+                if (typeof res === 'string') {
+                    // 只取第一个JSON对象
+                    try {
+                        res = JSON.parse(res.match(/^\{.*?\}\s*/)[0]);
+                    } catch (e) {
+                        console.error('JSON解析失败:', res);
+                        laptopList = [];
+                        filteredList = [];
+                        renderLaptopStats([]);
+                        renderLaptopTable([]);
+                        return;
+                    }
+                }
+                if (res.code === 0 && Array.isArray(res.data)) {
+                    laptopList = res.data;
+                    filteredList = laptopList;
+                    renderLaptopTablePage();
+                    renderLaptopStats(laptopList);
+                } else {
+                    laptopList = [];
+                    filteredList = [];
+                    renderLaptopTablePage();
+                    renderLaptopStats([]);
+                }
+            });
+        }
+
+        // 新增/编辑/删除操作
+        function addLaptop(data, cb) {
+            $.post(API_BASE, data, function(res) {
+                if (res.code === 0) fetchLaptopList();
+                if (cb) cb(res);
+            });
+        }
+        function editLaptop(id, data, cb) {
+            $.ajax({
+                url: API_BASE + '/' + id,
+                type: 'PUT',
+                data: data,
+                success: function(res) {
+                    if (res.code === 0) fetchLaptopList();
+                    if (cb) cb(res);
+                }
+            });
+        }
+        function deleteLaptop(id, cb) {
+            $.ajax({
+                url: API_BASE + '/' + id,
+                type: 'DELETE',
+                success: function(res) {
+                    if (res.code === 0) fetchLaptopList();
+                    if (cb) cb(res);
+                }
+            });
+        }
+        function batchDeleteLaptop(ids, cb) {
+            $.ajax({
+                url: API_BASE + '/batch',
+                type: 'POST',
+                data: { ids: ids },
+                success: function(res) {
+                    if (res.code === 0) fetchLaptopList();
+                    if (cb) cb(res);
+                }
+            });
+        }
+
+        // 查询表单
+        document.getElementById('laptopSearchForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            let query = {};
+            fd.forEach((v, k) => { if (v) query[k] = v; });
+            fetchLaptopList(query);
+        };
+
+        // 批量删除按钮逻辑
+        document.getElementById('batchDeleteBtn').onclick = function() {
+            const checkedBoxes = Array.from(document.querySelectorAll('.rowCheckbox')).filter(cb => cb.checked);
+            if (checkedBoxes.length === 0) {
+                showModal('请先选择要删除的笔记本');
+                return;
+            }
+            showModal(`确定要删除选中的${checkedBoxes.length}项吗？`, function() {
+                // 获取选中行的id
+                const ids = checkedBoxes.map(cb => cb.getAttribute('data-id'));
+                batchDeleteLaptop(ids);
+            });
+        };
+
+        // 渲染表格时绑定id
+        function renderLaptopTable(list) {
+            const tbody = document.getElementById('laptopTableBody');
+            tbody.innerHTML = '';
+            list.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="rowCheckbox" data-id="${item.id}" style="cursor:pointer;">
+                    </td>
+                    <td>${idx + 1}</td>
+                    <td>${item.name}</td>
+                    <td>${item.ip}</td>
+                    <td>${item.asset_id || item.assetId || ''}</td>
+                    <td>${item.value || ''}</td>
+                    <td>${item.currency || ''}</td>
+                    <td>${item.acquire_date || item.acquireDate || ''}</td>
+                    <td>${item.region}</td>
+                    <td>${item.department}</td>
+                    <td>${item.user}</td>
+                    <td>${item.status}</td>
+                    <td>${item.remark}</td>
+                    <td class="laptop-action-cell">
+                        <button style="display:inline-flex;align-items:center;gap:4px;color:#007bff;" onclick='showEditDrawer(${JSON.stringify(item).replace(/"/g, "&quot;")})'>
+                            <span style="width:18px;height:18px;display:inline-block;color:#007bff;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <path d="M4 13.5V16h2.5l9-9-2.5-2.5-9 9z" stroke="#007bff" stroke-width="2" fill="none"/>
+                                    <path d="M13.5 6.5l2 2" stroke="#007bff" stroke-width="2" fill="none"/>
+                                </svg>
+                            </span>
+                            <span>编辑</span>
+                        </button>
+                        <button style="display:inline-flex;align-items:center;gap:4px;color:#007bff;" onclick="showModal('删除：${item.name}', function(){ deleteLaptop(item.id); })">
+                            <span style="width:18px;height:18px;display:inline-block;color:#007bff;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <rect x="5" y="7" width="10" height="8" rx="2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                    <path d="M7 7V5a3 3 0 0 1 6 0v2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                    <line x1="8" y1="10" x2="8" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                    <line x1="12" y1="10" x2="12" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            <span>删除</span>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 绑定全选和行选
+            document.getElementById('selectAllLaptop').onclick = function() {
+                const checked = this.checked;
+                document.querySelectorAll('.rowCheckbox').forEach(cb => { cb.checked = checked; });
+            };
+            document.querySelectorAll('.rowCheckbox').forEach(cb => {
+                cb.onclick = function() {
+                    const all = document.querySelectorAll('.rowCheckbox');
+                    const allChecked = Array.from(all).every(x => x.checked);
+                    document.getElementById('selectAllLaptop').checked = allChecked;
+                };
+            });
+        }
+
+        // 页面弹窗逻辑
+        function showModal(text, okCallback) {
+            // 判断是否为删除弹窗
+            if (text && text.startsWith('删除：')) {
+                const name = text.replace('删除：', '').replace(/<.*?>/g, '').trim();
+                document.getElementById('modalTextContent').innerText = `确认删除：${name} ？`;
+                document.getElementById('modalTextContent').style.color = '#d9534f';
+                document.getElementById('modalText').style.display = 'flex';
+                document.getElementById('modalMask').style.display = 'block';
+                document.getElementById('modalOkBtn').onclick = function() {
+                    document.getElementById('modalMask').style.display = 'none';
+                    // 查找当前行的id
+                    const laptop = laptopList.find(item => item.name === name);
+                    if (laptop && laptop.id) {
+                        deleteLaptop(laptop.id, function(res) {
+                            // 删除后自动刷新列表
+                            fetchLaptopList();
+                            if (typeof okCallback === 'function') okCallback();
+                        });
+                    } else {
+                        if (typeof okCallback === 'function') okCallback();
+                    }
+                };
+                document.getElementById('modalCancelBtn').onclick = function() {
+                    document.getElementById('modalMask').style.display = 'none';
+                };
+                return;
+            }
+            document.getElementById('modalTextContent').innerText = text;
+            document.getElementById('modalTextContent').style.color = '#007bff';
+            document.getElementById('modalText').style.display = 'block';
+            document.getElementById('modalMask').style.display = 'block';
+            document.getElementById('modalOkBtn').onclick = function() {
+                document.getElementById('modalMask').style.display = 'none';
+                if (typeof okCallback === 'function') okCallback();
+            };
+            document.getElementById('modalCancelBtn').onclick = function() {
+                document.getElementById('modalMask').style.display = 'none';
+            };
+        }
+
+        document.getElementById('modalMask').addEventListener('mousedown', function(e) {
+            if (e.target === this) this.style.display = 'none';
+        });
+
+        function renderLaptopStats(list) {
+            const total = list.length;
+            const wenzhou = list.filter(s => s.region === '温州').length;
+            const chuzhou = list.filter(s => s.region === '滁州').length;
+            const thailand = list.filter(s => s.region === '泰国').length;
+            document.getElementById('laptopTotal').innerText = total;
+            document.getElementById('laptopWenzhou').innerText = wenzhou;
+            document.getElementById('laptopChuzhou').innerText = chuzhou;
+            document.getElementById('laptopThailand').innerText = thailand;
+        }
+
+        // 初始化数据变量
+        let laptopList = [];
+
+        // 查询数据并渲染
+        function fetchLaptopList(query = {}) {
+            $.get(API_BASE, query, function(res) {
+                // 调试输出
+                console.log('fetchLaptopList返回:', res);
+                // 兼容后端返回多次JSON（如 {"code":0,"data":[...]}{"code":0,"data":[...]})
+                if (typeof res === 'string') {
+                    // 只取第一个JSON对象
+                    try {
+                        res = JSON.parse(res.match(/^\{.*?\}\s*/)[0]);
+                    } catch (e) {
+                        console.error('JSON解析失败:', res);
+                        laptopList = [];
+                        filteredList = [];
+                        renderLaptopStats([]);
+                        renderLaptopTable([]);
+                        return;
+                    }
+                }
+                if (res.code === 0 && Array.isArray(res.data)) {
+                    laptopList = res.data;
+                    filteredList = laptopList;
+                    renderLaptopTablePage();
+                    renderLaptopStats(laptopList);
+                } else {
+                    laptopList = [];
+                    filteredList = [];
+                    renderLaptopTablePage();
+                    renderLaptopStats([]);
+                }
+            });
+        }
+
+        // 页面加载时自动获取数据（只绑定一次，避免重复调用）
+        let hasLoaded = false;
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!hasLoaded) {
+                fetchLaptopList();
+                hasLoaded = true;
+            }
+        });
+
+        // 新增弹窗逻辑
+        function showDrawer() {
+            const mask = document.getElementById('drawerMask');
+            const content = document.getElementById('drawerContent');
+            mask.style.display = 'block';
+            content.classList.remove('active');
+            setTimeout(() => {
+                content.classList.add('active');
+                content.style.transform = 'translateX(0)';
+            }, 10);
+        }
+        function hideDrawer() {
+            const mask = document.getElementById('drawerMask');
+            const content = document.getElementById('drawerContent');
+            content.classList.remove('active');
+            content.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                mask.style.display = 'none';
+                document.getElementById('addLaptopForm').reset();
+            }, 400);
+        }
+
+        document.getElementById('addLaptopBtn').onclick = function() {
+            showDrawer();
+        };
+        document.getElementById('drawerCancelBtn').onclick = function() {
+            hideDrawer();
+        };
+        document.getElementById('drawerMask').addEventListener('mousedown', function(e) {
+            if (e.target === this) {
+                hideDrawer();
+            }
+        });
+
+        // 检查资产编号是否重复
+        function checkAssetIdDuplicate(assetId, excludeId, cb) {
+            $.get(API_BASE, { assetId: assetId }, function(res) {
+                if (typeof res === 'string') {
+                    try { res = JSON.parse(res.match(/^\{.*?\}\s*/)[0]); } catch {}
+                }
+                if (res.code === 0 && Array.isArray(res.data)) {
+                    // 排除自身id（编辑时）
+                    const exists = res.data.some(item => item.asset_id === assetId && (!excludeId || item.id != excludeId));
+                    cb && cb(exists);
+                } else {
+                    cb && cb(false);
+                }
+            });
+        }
+
+        // 新增弹窗表单提交（使用JSON，允许部分字段为空）
+        document.getElementById('addLaptopForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            let data = {};
+            fd.forEach((v, k) => { data[k] = v; });
+            data.assetId = 'PC-' + (data.assetPrefix || '') + (data.assetNumber || '');
+            // 校验必填项
+            if (!data.name || !data.assetPrefix || !data.assetNumber) {
+                showModal('名称和资产编号为必填项');
+                return;
+            }
+            checkAssetIdDuplicate(data.assetId, null, function(duplicate) {
+                if (duplicate) {
+                    showModal('资产编号重复，请重新填写');
+                    return;
+                }
+                // 只传递有值的字段，允许部分字段为空
+                let payload = {
+                    name: data.name,
+                    assetId: data.assetId
+                };
+                if (data.ip) payload.ip = data.ip;
+                if (data.value) payload.value = data.value;
+                if (data.currency) payload.currency = data.currency;
+                if (data.acquireDate) payload.acquireDate = data.acquireDate;
+                if (data.region) payload.region = data.region;
+                if (data.department) payload.department = data.department;
+                if (data.user) payload.user = data.user;
+                if (data.status) payload.status = data.status;
+                if (data.remark) payload.remark = data.remark;
+                $.ajax({
+                    url: API_BASE,
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(payload),
+                    success: function(res) {
+                        if (res.code === 0) {
+                            hideDrawer();
+                            document.getElementById('successModal').style.display = 'block';
+                            fetchLaptopList();
+                        }
+                    }
+                });
+            });
+        };
+
+        // 编辑弹窗表单提交（使用JSON，允许部分字段为空）
+        document.getElementById('editLaptopForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            let data = {};
+            fd.forEach((v, k) => { data[k] = v; });
+            data.assetId = 'PC-' + (data.assetPrefix || '') + (data.assetNumber || '');
+            const id = data.id;
+            // 校验必填项
+            if (!data.name || !data.assetPrefix || !data.assetNumber) {
+                showModal('名称和资产编号为必填项');
+                return;
+            }
+            checkAssetIdDuplicate(data.assetId, id, function(duplicate) {
+                if (duplicate) {
+                    showModal('资产编号重复，请重新填写');
+                    return;
+                }
+                let payload = {
+                    id: id,
+                    name: data.name,
+                    assetId: data.assetId
+                };
+                if (data.ip) payload.ip = data.ip;
+                if (data.value) payload.value = data.value;
+                if (data.currency) payload.currency = data.currency;
+                if (data.acquireDate) payload.acquireDate = data.acquireDate;
+                if (data.region) payload.region = data.region;
+                if (data.department) payload.department = data.department;
+                if (data.user) payload.user = data.user;
+                if (data.status) payload.status = data.status;
+                if (data.remark) payload.remark = data.remark;
+                $.ajax({
+                    url: API_BASE + '/' + id,
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify(payload),
+                    success: function(res) {
+                        if (res.code === 0) {
+                            hideEditDrawer();
+                            fetchLaptopList();
+                        }
+                    }
+                });
+            });
+        };
+
+        // 编辑弹窗动画逻辑
+        function showEditDrawer(laptop) {
+            const mask = document.getElementById('editDrawerMask');
+            const content = document.getElementById('editDrawerContent');
+            mask.style.display = 'block';
+            content.classList.remove('active');
+            setTimeout(() => {
+                content.classList.add('active');
+                content.style.transform = 'translateX(0)';
+            }, 10);
+
+            // 填充表单
+            const form = document.getElementById('editLaptopForm');
+            form.id.value = laptop.id || '';
+            form.name.value = laptop.name || '';
+            form.ip.value = laptop.ip || '';
+            // 资产编号拆分
+            let assetId = laptop.asset_id || laptop.assetId || '';
+            let prefix = 'A', number = '';
+            if (assetId.startsWith('PC-')) {
+                let parts = assetId.replace('PC-', '').split('');
+                prefix = parts[0] || 'A';
+                number = parts.slice(1).join('') || '';
+            }
+            form.assetPrefix.value = prefix;
+            form.assetNumber.value = number;
+            form.value.value = laptop.value || '';
+            form.currency.value = laptop.currency || 'CNY';
+            form.acquireDate.value = laptop.acquire_date || laptop.acquireDate || '';
+            form.region.value = laptop.region || '温州';
+            form.department.value = laptop.department || '';
+            form.user.value = laptop.user || '';
+            form.status.value = laptop.status || '';
+            form.remark.value = laptop.remark || '';
+        }
+        function hideEditDrawer() {
+            const mask = document.getElementById('editDrawerMask');
+            const content = document.getElementById('editDrawerContent');
+            content.classList.remove('active');
+            content.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                mask.style.display = 'none';
+                document.getElementById('editLaptopForm').reset();
+            }, 400);
+        }
+        document.getElementById('editDrawerCancelBtn').onclick = function() {
+            hideEditDrawer();
+        };
+        document.getElementById('editDrawerMask').addEventListener('mousedown', function(e) {
+            if (e.target === this) {
+                hideEditDrawer();
+            }
+        });
+
+        // 新增成功弹窗关闭
+        document.getElementById('successModalCloseBtn').onclick = function() {
+            document.getElementById('successModal').style.display = 'none';
+        };
+        // 新增成功弹窗点击遮罩关闭
+        document.getElementById('successModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
