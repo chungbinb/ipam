@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>显示器管理</title>
+    <link rel="stylesheet" type="text/css" href="../public/css/Pagestyle.css">
+    <style>
+        /* 复用IP段管理页面风格 */
+        /* ...existing code from ipSegment.html style... */
+        html, body {
+            width: 100vw;
+            min-width: 0;
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f8f9fa;
+            min-height: 100vh;
+            width: 100vw;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            padding: 40px;
+            width: 100vw;
+            max-width: 100vw;
+            min-width: 800px;
+            margin: 0;
+            box-sizing: border-box;
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .table-scroll-x {
+            width: 100%;
+            overflow-x: auto;
+            position: relative;
+            margin-bottom: 0;
+        }
+        .table-scroll-y {
+            width: 100%;
+            overflow-y: auto;
+            position: relative;
+        }
+        table.monitor-table {
+            min-width: 800px;
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+        }
+        /* ...existing code... */
+        @media (max-width: 1200px) {
+            .container { padding: 12px; min-width: 800px; }
+            table.monitor-table { min-width: 800px; }
+        }
+        @media (max-width: 900px) {
+            .container { padding: 4px; min-width: 800px; }
+            table.monitor-table { min-width: 800px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部统计卡片 -->
+        <div style="display:flex;gap:24px;margin-bottom:32px;">
+            <div class="stat-card">
+                <div id="monitorTotal">0</div>
+                <div>显示器总数</div>
+            </div>
+            <div class="stat-card">
+                <div id="monitorNormal">0</div>
+                <div>正常显示器数</div>
+            </div>
+            <div class="stat-card">
+                <div id="monitorBroken">0</div>
+                <div>已坏显示器数</div>
+            </div>
+            <div class="stat-card">
+                <div id="monitorScrap">0</div>
+                <div>报废显示器数</div>
+            </div>
+        </div>
+        <!-- 查询表单 -->
+        <form id="monitorSearchForm" style="margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap;">
+            <input type="text" name="brand" placeholder="品牌">
+            <input type="text" name="assetId" placeholder="资产编号">
+            <input type="text" name="department" placeholder="使用部门">
+            <input type="text" name="user" placeholder="使用人">
+            <input type="text" name="size" placeholder="尺寸">
+            <input type="text" name="model" placeholder="型号">
+            <input type="text" name="spec" placeholder="规格">
+            <select name="status">
+                <option value="">全部状态</option>
+                <option value="正常">正常</option>
+                <option value="已坏">已坏</option>
+                <option value="报废">报废</option>
+            </select>
+            <button type="submit">查询</button>
+        </form>
+        <!-- 操作按钮 -->
+        <div style="margin-bottom:12px;">
+            <button id="addMonitorBtn">新增</button>
+            <button id="batchDeleteMonitorBtn" style="background:#d9534f;">批量删除</button>
+        </div>
+        <!-- 列表 -->
+        <div class="table-scroll-x">
+            <div class="table-scroll-y" id="monitorTableScrollY">
+                <table class="monitor-table" id="monitorTable" style="min-width:1200px;">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;text-align:center;">
+                                <input type="checkbox" id="selectAllMonitor" style="cursor:pointer;">
+                            </th>
+                            <th>序号</th>
+                            <th>品牌</th>
+                            <th>资产编号</th>
+                            <th>使用部门</th>
+                            <th>使用人</th>
+                            <th>尺寸</th>
+                            <th>型号</th>
+                            <th>规格</th>
+                            <th>状态</th>
+                            <th>备注</th>
+                            <th style="min-width:72px;width:72px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="monitorTableBody">
+                        <!-- 数据行由JS渲染 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- 分页控件 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0;">
+            <div>
+                每页
+                <select id="monitorPageSizeSelect" style="padding:4px 12px;">
+                    <option value="10">10行</option>
+                    <option value="20" selected>20行</option>
+                    <option value="50">50行</option>
+                </select>
+            </div>
+            <div id="monitorPaginationBar" class="pagination-bar"></div>
+        </div>
+        <!-- 新增弹窗 -->
+        <div id="addMonitorModal" style="display:none;position:fixed;top:0;right:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;">
+            <div id="addMonitorContent"
+                style="position:fixed;top:0;right:0;width:400px;height:100vh;background:#fff;box-shadow:-2px 0 16px #0002;padding:32px 24px;overflow-y:auto;transition:transform 0.4s cubic-bezier(.4,0,.2,1);transform:translateX(100%);border-radius:10px 0 0 10px;">
+                <div style="font-size:20px;font-weight:bold;color:#007bff;margin-bottom:24px;">新增显示器</div>
+                <form id="addMonitorForm" style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">品牌</label>
+                        <select name="brand" id="monitorBrandSelect" required style="flex:1;">
+                            <option value="">请选择品牌</option>
+                            <!-- 品牌选项由JS动态渲染 -->
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">资产编号</label>
+                        <span style="margin-right:6px;">Monitor-</span>
+                        <select name="assetPrefix" required style="width:60px;">
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="X">X</option>
+                        </select>
+                        <input type="text" name="assetNumber" maxlength="4" pattern="\d{4}" required placeholder="四位数字" style="width:80px;margin-left:8px;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">使用部门</label>
+                        <select name="department" id="addMonitorDepartmentSelect" style="flex:1;">
+                            <option value="">请选择部门</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">使用人</label>
+                        <input type="text" name="user" style="flex:1;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">尺寸</label>
+                        <input type="text" name="size" style="flex:1;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">型号</label>
+                        <input type="text" name="model" style="flex:1;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">规格</label>
+                        <input type="text" name="spec" style="flex:1;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">状态</label>
+                        <select name="status" required style="flex:1;">
+                            <option value="正常">正常</option>
+                            <option value="已坏">已坏</option>
+                            <option value="报废">报废</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">备注</label>
+                        <input type="text" name="remark" style="flex:1;">
+                    </div>
+                    <div style="display:flex;gap:16px;justify-content:flex-end;">
+                        <button type="button" id="addMonitorCancelBtn" style="background:#6c757d;color:#fff;">取消</button>
+                        <button type="submit" style="background:#007bff;color:#fff;">确定</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- 编辑弹窗 -->
+        <div id="editMonitorModal" style="display:none;position:fixed;top:0;right:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;">
+            <div id="editMonitorContent"
+                style="position:absolute;top:0;right:0;width:400px;height:100vh;background:#fff;box-shadow:-2px 0 16px #0002;padding:32px 24px;overflow-y:auto;transition:transform 0.4s cubic-bezier(.4,0,.2,1);transform:translateX(100%);">
+                <div style="font-size:20px;font-weight:bold;color:#007bff;margin-bottom:24px;">编辑显示器</div>
+                <form id="editMonitorForm" style="display:flex;flex-direction:column;gap:16px;">
+                    <input type="hidden" name="id">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">品牌</label>
+                        <select name="brand" id="editMonitorBrandSelect" required style="flex:1;">
+                            <option value="">请选择品牌</option>
+                            <!-- 品牌选项由JS动态渲染 -->
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">资产编号</label>
+                        <span style="margin-right:6px;">Monitor-</span>
+                        <select name="assetPrefix" required style="width:60px;">
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                            <option value="E">E</option>
+                            <option value="F">F</option>
+                            <option value="X">X</option>
+                        </select>
+                        <input type="text" name="assetNumber" maxlength="4" pattern="\d{4}" required placeholder="四位数字" style="width:80px;margin-left:8px;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">使用部门</label>
+                        <select name="department" id="editMonitorDepartmentSelect" style="flex:1;">
+                            <option value="">请选择部门</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">使用人</label>
+                        <input type="text" name="user" style="flex:1;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">尺寸</label>
+                        <input type="text" name="size" style="flex:1;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">型号</label>
+                        <input type="text" name="model" style="flex:1;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">规格</label>
+                        <input type="text" name="spec" style="flex:1;">
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">状态</label>
+                        <select name="status" required style="flex:1;">
+                            <option value="正常">正常</option>
+                            <option value="已坏">已坏</option>
+                            <option value="报废">报废</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <label style="min-width:80px;">备注</label>
+                        <input type="text" name="remark" style="flex:1;">
+                    </div>
+                    <div style="display:flex;gap:16px;justify-content:flex-end;">
+                        <button type="button" id="editMonitorCancelBtn" style="background:#6c757d;color:#fff;">取消</button>
+                        <button type="submit" style="background:#007bff;color:#fff;">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 数据变量
+        let monitorList = [];
+        let filteredList = [];
+        let currentPage = 1;
+        let pageSize = 20;
+
+        // 统计卡片渲染
+        function renderMonitorStats(list) {
+            document.getElementById('monitorTotal').innerText = list.length;
+            document.getElementById('monitorNormal').innerText = list.filter(x => x.status === '正常').length;
+            document.getElementById('monitorBroken').innerText = list.filter(x => x.status === '已坏').length;
+            document.getElementById('monitorScrap').innerText = list.filter(x => x.status === '报废').length;
+        }
+
+        // 表格分页渲染
+        function renderMonitorTablePage() {
+            const total = filteredList.length;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            currentPage = Math.min(currentPage, totalPages);
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, total);
+            const pageData = filteredList.slice(startIdx, endIdx);
+
+            const tbody = document.getElementById('monitorTableBody');
+            tbody.innerHTML = '';
+            pageData.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="rowCheckbox" data-id="${item.id}" style="cursor:pointer;">
+                    </td>
+                    <td>${startIdx + idx + 1}</td>
+                    <td>${item.brand || ''}</td>
+                    <td>${item.assetId || item.asset_id || ''}</td>
+                    <td>${item.department || ''}</td>
+                    <td>${item.user || ''}</td>
+                    <td>${item.size || ''}</td>
+                    <td>${item.model || ''}</td>
+                    <td>${item.spec || ''}</td>
+                    <td>${item.status || ''}</td>
+                    <td>${item.remark || ''}</td>
+                    <td class="monitor-action-cell" style="min-width:72px;width:72px;">
+                        <button style="background:none;border:none;color:#007bff;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"
+        onclick='showEditMonitorDrawer(${JSON.stringify(item).replace(/"/g, "&quot;")})'>
+        <span style="width:18px;height:18px;display:inline-block;">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                <path d="M4 13.5V16h2.5l9-9-2.5-2.5-9 9z" stroke="#007bff" stroke-width="2" fill="none"/>
+                <path d="M13.5 6.5l2 2" stroke="#007bff" stroke-width="2" fill="none"/>
+            </svg>
+        </span>
+        <span>编辑</span>
+    </button>
+    <button style="background:none;border:none;color:#d9534f;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"
+        onclick="deleteMonitor(${item.id})">
+        <span style="width:18px;height:18px;display:inline-block;">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                <rect x="5" y="7" width="10" height="8" rx="2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                <path d="M7 7V5a3 3 0 0 1 6 0v2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                <line x1="8" y1="10" x2="8" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                <line x1="12" y1="10" x2="12" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </span>
+        <span>删除</span>
+    </button>
+</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 绑定全选和行选
+            document.getElementById('selectAllMonitor').onclick = function() {
+                const checked = this.checked;
+                document.querySelectorAll('.rowCheckbox').forEach(cb => { cb.checked = checked; });
+            };
+            document.querySelectorAll('.rowCheckbox').forEach(cb => {
+                cb.onclick = function() {
+                    const all = document.querySelectorAll('.rowCheckbox');
+                    const allChecked = Array.from(all).every(x => x.checked);
+                    document.getElementById('selectAllMonitor').checked = allChecked;
+                };
+            });
+
+            renderMonitorPaginationBar(totalPages);
+        }
+
+        function renderMonitorPaginationBar(totalPages) {
+            const bar = document.getElementById('monitorPaginationBar');
+            const total = filteredList.length;
+            if (totalPages <= 1) {
+                bar.innerHTML = `共 ${total} 条数据`;
+                return;
+            }
+            let html = `共 ${total} 条数据 `;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoMonitorPage(1)">首页</button>`;
+            html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoMonitorPage(${currentPage - 1})">上一页</button>`;
+            let pageBtns = [];
+            let maxShow = 7;
+            if (totalPages <= maxShow) {
+                for (let i = 1; i <= totalPages; i++) {
+                    pageBtns.push(i);
+                }
+            } else {
+                if (currentPage <= 4) {
+                    pageBtns = [1,2,3,4,5,'...',totalPages];
+                } else if (currentPage >= totalPages - 3) {
+                    pageBtns = [1,'...',totalPages-4,totalPages-3,totalPages-2,totalPages-1,totalPages];
+                } else {
+                    pageBtns = [1,'...',currentPage-1,currentPage,currentPage+1,'...',totalPages];
+                }
+            }
+            pageBtns.forEach(p => {
+                if (p === '...') {
+                    html += `<span style="padding:0 4px;">...</span>`;
+                } else {
+                    html += `<button class="page-btn${p===currentPage?' active':''}" onclick="gotoMonitorPage(${p})">${p}</button>`;
+                }
+            });
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoMonitorPage(${currentPage + 1})">下一页</button>`;
+            html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoMonitorPage(${totalPages})">末页</button>`;
+            html += `<span style="margin-left:8px;">跳至</span>
+                <input type="number" min="1" max="${totalPages}" id="monitorJumpPageInput" class="jump-input" value="${currentPage}">
+                <button class="jump-btn" onclick="monitorJumpToPage(${totalPages})">确定</button>`;
+            bar.innerHTML = html;
+            document.getElementById('monitorJumpPageInput').onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    monitorJumpToPage(totalPages);
+                }
+            };
+        }
+
+        window.gotoMonitorPage = function(page) {
+            page = Math.max(1, Math.min(page, Math.ceil(filteredList.length / pageSize)));
+            currentPage = page;
+            renderMonitorTablePage();
+        };
+
+        window.monitorJumpToPage = function(totalPages) {
+            const input = document.getElementById('monitorJumpPageInput');
+            let val = parseInt(input.value, 10);
+            if (!val || val < 1 || val > totalPages) return;
+            gotoMonitorPage(val);
+        };
+
+        document.getElementById('monitorPageSizeSelect').onchange = function() {
+            pageSize = parseInt(this.value, 10);
+            currentPage = 1;
+            renderMonitorTablePage();
+        };
+
+        // 查询表单
+        document.getElementById('monitorSearchForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            let filtered = monitorList.filter(item => {
+                return (!fd.get('brand') || item.brand.includes(fd.get('brand')))
+                    && (!fd.get('assetId') || item.assetId.includes(fd.get('assetId')))
+                    && (!fd.get('department') || item.department.includes(fd.get('department')))
+                    && (!fd.get('user') || item.user.includes(fd.get('user')))
+                    && (!fd.get('size') || item.size.includes(fd.get('size')))
+                    && (!fd.get('model') || item.model.includes(fd.get('model')))
+                    && (!fd.get('spec') || item.spec.includes(fd.get('spec')))
+                    && (!fd.get('status') || item.status === fd.get('status'));
+            });
+            filteredList = filtered;
+            currentPage = 1;
+            renderMonitorTablePage();
+            renderMonitorStats(filteredList);
+        };
+
+        // 品牌下拉框渲染
+        function renderMonitorBrandSelect(selectId, selectedValue) {
+            fetch('../api/brand?type=monitor')
+                .then(res => res.json())
+                .then(res => {
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = '<option value="">请选择品牌</option>';
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        res.data.forEach(item => {
+                            const opt = document.createElement('option');
+                            opt.value = item.name;
+                            opt.textContent = item.name;
+                            select.appendChild(opt);
+                        });
+                        if (selectedValue) {
+                            select.value = selectedValue;
+                        }
+                    }
+                });
+        }
+
+        // 部门下拉框渲染
+        function renderDepartmentSelect(selectId, selectedValue) {
+            fetch('../api/department')
+                .then(res => res.json())
+                .then(res => {
+                    const select = document.getElementById(selectId);
+                    select.innerHTML = '<option value="">请选择部门</option>';
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        res.data.forEach(item => {
+                            const opt = document.createElement('option');
+                            opt.value = item.name;
+                            opt.textContent = item.name;
+                            select.appendChild(opt);
+                        });
+                        if (selectedValue) {
+                            select.value = selectedValue;
+                        }
+                    }
+                });
+        }
+
+        // 新增弹窗逻辑
+        function showAddMonitorDrawer() {
+            renderMonitorBrandSelect('monitorBrandSelect');
+            renderDepartmentSelect('addMonitorDepartmentSelect'); // 渲染部门下拉框
+            const mask = document.getElementById('addMonitorModal');
+            const content = document.getElementById('addMonitorContent');
+            mask.style.display = 'block';
+            content.classList.remove('active');
+            setTimeout(() => {
+                content.classList.add('active');
+                content.style.transform = 'translateX(0)';
+            }, 10);
+        }
+        function hideAddMonitorDrawer() {
+            const mask = document.getElementById('addMonitorModal');
+            const content = document.getElementById('addMonitorContent');
+            content.classList.remove('active');
+            content.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                mask.style.display = 'none';
+                document.getElementById('addMonitorForm').reset();
+            }, 400);
+        }
+        document.getElementById('addMonitorBtn').onclick = showAddMonitorDrawer;
+        document.getElementById('addMonitorCancelBtn').onclick = hideAddMonitorDrawer;
+        document.getElementById('addMonitorModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) hideAddMonitorDrawer();
+        });
+
+        // 编辑弹窗逻辑
+        function showEditMonitorDrawer(monitor) {
+            const mask = document.getElementById('editMonitorModal');
+            const content = document.getElementById('editMonitorContent');
+            mask.style.display = 'block';
+            content.classList.remove('active');
+            setTimeout(() => {
+                content.classList.add('active');
+                content.style.transform = 'translateX(0)';
+            }, 10);
+
+            // 填充表单
+            const form = document.getElementById('editMonitorForm');
+            form.id.value = monitor.id || '';
+            
+            renderMonitorBrandSelect('editMonitorBrandSelect', monitor.brand);
+
+            // 拆分资产编号
+            let assetId = monitor.assetId || monitor.asset_id || '';
+            let prefix = 'A', number = '';
+            if (assetId.startsWith('Monitor-')) {
+                let parts = assetId.replace('Monitor-', '').split('');
+                prefix = parts[0] || 'A';
+                number = parts.slice(1).join('') || '';
+            }
+            form.assetPrefix.value = prefix;
+            form.assetNumber.value = number;
+            
+            renderDepartmentSelect('editMonitorDepartmentSelect', monitor.department); // 渲染并选中部门
+
+            form.user.value = monitor.user || '';
+            form.size.value = monitor.size || '';
+            form.model.value = monitor.model || '';
+            form.spec.value = monitor.spec || '';
+            form.status.value = monitor.status || '正常';
+            form.remark.value = monitor.remark || '';
+        }
+        function hideEditMonitorDrawer() {
+            const mask = document.getElementById('editMonitorModal');
+            const content = document.getElementById('editMonitorContent');
+            content.classList.remove('active');
+            content.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                mask.style.display = 'none';
+                document.getElementById('editMonitorForm').reset();
+            }, 400);
+        }
+        document.getElementById('editMonitorCancelBtn').onclick = hideEditMonitorDrawer;
+        document.getElementById('editMonitorModal').addEventListener('mousedown', function(e) {
+            if (e.target === this) hideEditMonitorDrawer();
+        });
+
+        // 新增/编辑/删除/批量删除操作（需后端API支持）
+        function addMonitor(data, cb) {
+            fetch('../api/monitor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) fetchMonitorList();
+                if (cb) cb(res);
+            });
+        }
+        function editMonitor(id, data, cb) {
+            fetch('../api/monitor/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) fetchMonitorList();
+                if (cb) cb(res);
+            });
+        }
+        function deleteMonitor(id, cb) {
+            fetch('../api/monitor/' + id, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) fetchMonitorList();
+                if (cb) cb(res);
+            });
+        }
+        function batchDeleteMonitor(ids, cb) {
+            fetch('../api/monitor/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) fetchMonitorList();
+                if (cb) cb(res);
+            });
+        }
+
+        // 新增表单提交
+        document.getElementById('addMonitorForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            // 组装资产编号
+            const assetId = 'Monitor-' + (fd.get('assetPrefix') || '') + (fd.get('assetNumber') || '');
+            let data = {};
+            fd.forEach((v, k) => { data[k] = v; });
+            data.assetId = assetId;
+            data.asset_number = assetId; // 关键：同步 asset_number 字段，后端依赖此字段
+            delete data.assetPrefix;
+            delete data.assetNumber;
+            addMonitor(data, function(res) {
+                if (res.code === 0) {
+                    hideAddMonitorDrawer();
+                } else {
+                    alert(res.msg || '新增失败');
+                }
+            });
+        };
+
+        // 编辑表单提交
+        document.getElementById('editMonitorForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            // 组装资产编号
+            const assetId = 'Monitor-' + (fd.get('assetPrefix') || '') + (fd.get('assetNumber') || '');
+            let data = {};
+            fd.forEach((v, k) => { data[k] = v; });
+            data.assetId = assetId;
+            delete data.assetPrefix;
+            delete data.assetNumber;
+            const id = data.id;
+            editMonitor(id, data, function(res) {
+                if (res.code === 0) {
+                    hideEditMonitorDrawer();
+                }
+            });
+        };
+
+        // 批量删除按钮
+        document.getElementById('batchDeleteMonitorBtn').onclick = function() {
+            const checkedBoxes = Array.from(document.querySelectorAll('.rowCheckbox')).filter(cb => cb.checked);
+            if (checkedBoxes.length === 0) {
+                alert('请先选择要删除的显示器');
+                return;
+            }
+            if (confirm(`确定要删除选中的${checkedBoxes.length}项吗？`)) {
+                const ids = checkedBoxes.map(cb => cb.getAttribute('data-id'));
+                batchDeleteMonitor(ids);
+            }
+        };
+
+        // 查询数据并渲染
+        function fetchMonitorList() {
+            fetch('../api/monitor')
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        monitorList = res.data;
+                        filteredList = monitorList;
+                        renderMonitorTablePage();
+                        renderMonitorStats(monitorList);
+                    } else {
+                        monitorList = [];
+                        filteredList = [];
+                        renderMonitorTablePage();
+                        renderMonitorStats([]);
+                    }
+                });
+        }
+
+        // 页面加载时自动获取数据
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchMonitorList();
+        });
+    </script>
+</body>
+</html>
+

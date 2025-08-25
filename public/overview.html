@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>概览</title>
+    <link rel="stylesheet" type="text/css" href="../public/css/Pagestyle.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f0f2f5;
+            color: #333;
+        }
+        .container {
+            padding: 24px;
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+        }
+        .chart-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .chart-card h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: #2d3e50;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="font-size: 2rem; color: #2d3e50; margin-bottom: 32px;">数据概览</h1>
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>资产分布</h2>
+                <canvas id="assetDistributionChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h2>各部门IP使用量 (Top 10)</h2>
+                <canvas id="ipUsageChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h2>耗材库存 (Top 5)</h2>
+                <canvas id="consumableStockChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('../api/overview/stats')
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        renderCharts(res.data);
+                    }
+                });
+        });
+
+        function renderCharts(data) {
+            if (data.asset_distribution) {
+                renderAssetDistributionChart(data.asset_distribution);
+            }
+            if (data.ip_usage_by_department) {
+                renderIpUsageChart(data.ip_usage_by_department);
+            }
+            if (data.top_consumables) {
+                renderConsumableStockChart(data.top_consumables);
+            }
+        }
+
+        function renderAssetDistributionChart(assetData) {
+            const ctx = document.getElementById('assetDistributionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(assetData),
+                    datasets: [{
+                        label: '资产数量',
+                        data: Object.values(assetData),
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(75, 192, 192, 0.8)',
+                            'rgba(153, 102, 255, 0.8)',
+                            'rgba(255, 159, 64, 0.8)'
+                        ],
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderIpUsageChart(ipData) {
+            const ctx = document.getElementById('ipUsageChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ipData.map(d => d.department),
+                    datasets: [{
+                        label: '已使用IP数',
+                        data: ipData.map(d => d.count),
+                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderConsumableStockChart(consumableData) {
+            const ctx = document.getElementById('consumableStockChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: consumableData.map(d => d.name),
+                    datasets: [{
+                        label: '库存数量',
+                        data: consumableData.map(d => d.stock),
+                        backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                        borderColor: 'rgba(46, 204, 113, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // 设置为水平柱状图
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // 统计卡片与图标函数已移除
+    </script>
+</body>
+</html>

@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>日志管理</title>
+    <link rel="stylesheet" type="text/css" href="../public/css/Pagestyle.css">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f8f9fa; }
+        .container { 
+            padding: 40px; 
+            width: 100%;
+            max-width: none;
+            min-width: 800px;
+            margin: 0;
+            box-sizing: border-box;
+        }
+        .stats-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 20px; 
+            margin-bottom: 30px; 
+        }
+        .stat-card { 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15); 
+            border: 1px solid rgba(255,255,255,0.2);
+            text-align: center; 
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .stat-card h3 { margin: 0 0 10px 0; font-size: 14px; font-weight: 500; }
+        .stat-card .number { font-size: 24px; font-weight: bold; }
+        .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .btn { 
+            background: #007bff; 
+            border: none; 
+            color: #fff; 
+            padding: 8px 16px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 14px;
+        }
+        .btn:hover { background: #0056b3; }
+        .btn.danger { background: #dc3545; }
+        .btn.danger:hover { background: #c82333; }
+        .tabs { display: flex; border-bottom: 2px solid #dee2e6; margin-bottom: 20px; }
+        .tab-link { padding: 12px 24px; cursor: pointer; border: none; background: none; font-size: 16px; color: #495057; }
+        .tab-link.active { color: #007bff; border-bottom: 2px solid #007bff; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            background: #fff; 
+            box-shadow: 0 2px 8px #0001; 
+            table-layout: auto; 
+        }
+        th, td { 
+            border: 1px solid #e0e0e0; 
+            padding: 10px 12px; 
+            text-align: left; 
+            white-space: pre-wrap; 
+            word-break: break-word; 
+            vertical-align: top;
+        }
+        th { background: #f4f6fa; font-weight: 500; }
+        tbody tr:nth-child(odd) { background: #f8f9fa; }
+        tbody tr:hover { background: #e3f2fd; transition: background-color 0.2s; }
+        tbody tr { cursor: pointer; }
+        pre { margin: 0; font-family: Consolas, monaco, monospace; font-size: 13px; }
+        .level-info { color: #17a2b8; font-weight: bold; }
+        .level-warning { color: #ffc107; font-weight: bold; }
+        .level-error { color: #dc3545; font-weight: bold; }
+        
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .container { 
+                min-width: 800px; 
+                padding: 20px; 
+            }
+            .stats-container { 
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+                gap: 15px; 
+            }
+        }
+        
+        @media (max-width: 900px) {
+            .container { 
+                min-width: 600px; 
+                padding: 15px; 
+            }
+            .stats-container { 
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+                gap: 10px; 
+            }
+            th, td { 
+                padding: 8px 10px; 
+                font-size: 13px; 
+            }
+        }
+        
+        /* 确保表格容器在大屏幕上也能充分利用空间 */
+        .tab-content {
+            width: 100%;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="font-size: 2rem; color: #2d3e50; margin-bottom: 32px;">日志管理</h1>
+        
+        <!-- 统计信息 -->
+        <div class="stats-container" id="statsContainer">
+            <!-- 统计卡片将通过JavaScript动态生成 -->
+        </div>
+        
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <button class="btn" onclick="refreshLogs()">刷新</button>
+            <button id="cleanupBtn" class="btn danger" onclick="cleanupLogs()">清理旧日志</button>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab-link active" onclick="openTab(event, 'operation')">操作日志</button>
+            <button class="tab-link" onclick="openTab(event, 'login')">登录日志</button>
+            <button class="tab-link" onclick="openTab(event, 'runtime')">运行日志</button>
+        </div>
+
+        <div id="operation" class="tab-content active">
+            <table id="operationLogTable">
+                <thead><tr><th>ID</th><th>级别</th><th>用户</th><th>信息</th><th>上下文</th><th>时间</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="login" class="tab-content">
+            <table id="loginLogTable">
+                <thead><tr><th>ID</th><th>级别</th><th>用户</th><th>信息</th><th>上下文</th><th>时间</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="runtime" class="tab-content">
+            <table id="runtimeLogTable">
+                <thead><tr><th>ID</th><th>级别</th><th>用户</th><th>信息</th><th>上下文</th><th>时间</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 日志详情弹窗 -->
+    <div id="logDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); max-width: 800px; width: 90%; max-height: 80%; overflow-y: auto;">
+            <div style="padding: 20px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #2d3e50;">日志详情</h3>
+                <button onclick="closeLogDetailModal()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666;">&times;</button>
+            </div>
+            <div id="logDetailContent" style="padding: 20px;">
+                <!-- 详细内容将通过JavaScript填充 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLogType = 'operation';
+
+        function openTab(evt, logType) {
+            let i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tab-link");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(logType).style.display = "block";
+            evt.currentTarget.className += " active";
+            currentLogType = logType;
+            fetchLogs(logType);
+        }
+
+        function fetchLogs(logType) {
+            fetch('../api/logs?log_type=' + logType)
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        renderLogTable(logType, res.data);
+                    } else {
+                        console.error('获取日志失败:', res);
+                    }
+                })
+                .catch(err => {
+                    console.error('请求日志失败:', err);
+                });
+        }
+
+        function fetchStatistics() {
+            fetch('../api/logs/statistics')
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        renderStatistics(res.data);
+                    } else {
+                        console.error('获取统计数据失败:', res);
+                        const container = document.getElementById('statsContainer');
+                        container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">获取统计数据失败: ' + (res.msg || '未知错误') + '</div>';
+                    }
+                })
+                .catch(err => {
+                    console.error('获取统计失败:', err);
+                    const container = document.getElementById('statsContainer');
+                    container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">网络请求失败: ' + err.message + '</div>';
+                });
+        }
+
+        function renderStatistics(stats) {
+            const container = document.getElementById('statsContainer');
+            container.innerHTML = '';
+
+            if (!stats) {
+                container.innerHTML = '<div style="color: red; text-align: center;">统计数据为空</div>';
+                return;
+            }
+
+            // 今日日志
+            const todayCount = stats.today || 0;
+            const todayCard = createStatCard('今日日志', todayCount);
+            container.appendChild(todayCard);
+
+            // 本周日志
+            const weekCount = stats.this_week || 0;
+            const weekCard = createStatCard('本周日志', weekCount);
+            container.appendChild(weekCard);
+
+            // 按类型统计
+            if (stats.by_type && Array.isArray(stats.by_type)) {
+                stats.by_type.forEach(item => {
+                    const typeNames = {
+                        'operation': '操作日志',
+                        'login': '登录日志',
+                        'runtime': '运行日志'
+                    };
+                    const typeName = typeNames[item.log_type] || item.log_type;
+                    const card = createStatCard(typeName, item.count);
+                    container.appendChild(card);
+                });
+            }
+
+            // 按级别统计
+            if (stats.by_level && Array.isArray(stats.by_level)) {
+                stats.by_level.forEach(item => {
+                    const levelNames = {
+                        'info': '信息日志',
+                        'warning': '警告日志',
+                        'error': '错误日志'
+                    };
+                    const levelName = levelNames[item.level] || item.level;
+                    const card = createStatCard(levelName, item.count);
+                    container.appendChild(card);
+                });
+            }
+        }
+
+        function createStatCard(title, number, cardType = 'default') {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            
+            // 根据卡片类型设置不同的背景颜色和文本颜色
+            let backgroundColor = '#007bff';
+            let textColor = '#fff'; // 默认白色文本
+            
+            if (title.includes('今日')) {
+                backgroundColor = '#28a745'; // 绿色背景
+                textColor = '#fff'; // 白色文本
+            } else if (title.includes('本周')) {
+                backgroundColor = '#17a2b8'; // 青色背景
+                textColor = '#fff'; // 白色文本
+            } else if (title.includes('操作日志')) {
+                backgroundColor = '#007bff'; // 蓝色背景
+                textColor = '#fff'; // 白色文本
+            } else if (title.includes('登录日志')) {
+                backgroundColor = '#6610f2'; // 紫色背景
+                textColor = '#fff'; // 白色文本
+            } else if (title.includes('运行日志')) {
+                backgroundColor = '#fd7e14'; // 橙色背景
+                textColor = '#fff'; // 白色文本
+            } else if (title.includes('信息日志')) {
+                backgroundColor = '#17a2b8'; // 青色背景
+                textColor = '#fff'; // 白色文本
+            } else if (title.includes('警告日志')) {
+                backgroundColor = '#ffc107'; // 黄色背景
+                textColor = '#000'; // 黑色文本（黄色背景用黑色文本更清晰）
+            } else if (title.includes('错误日志')) {
+                backgroundColor = '#dc3545'; // 红色背景
+                textColor = '#fff'; // 白色文本
+            }
+            
+            // 设置卡片的背景色和文本颜色
+            card.style.background = backgroundColor;
+            card.style.color = textColor;
+            
+            card.innerHTML = `
+                <h3 style="color: ${textColor}; margin: 0 0 10px 0; font-size: 14px; font-weight: 500;">${title}</h3>
+                <div class="number" style="color: ${textColor}; font-size: 24px; font-weight: bold;">${number}</div>
+            `;
+            return card;
+        }
+
+        function renderLogTable(logType, data) {
+            const tableBody = document.querySelector(`#${logType}LogTable tbody`);
+            if (!tableBody) return;
+            tableBody.innerHTML = '';
+            
+            data.forEach(log => {
+                const tr = document.createElement('tr');
+                tr.style.cursor = 'pointer';
+                tr.title = '点击查看详细信息';
+                
+                // 简化上下文显示
+                let contextHtml = '';
+                if (log.context) {
+                    try {
+                        const contextObj = JSON.parse(log.context);
+                        contextHtml = getSimplifiedContext(logType, contextObj);
+                    } catch (e) {
+                        contextHtml = escapeHtml(log.context).substring(0, 50) + '...';
+                    }
+                } else {
+                    contextHtml = '-';
+                }
+
+                // 设置级别样式
+                const levelClass = `level-${log.level || 'info'}`;
+                
+                tr.innerHTML = `
+                    <td>${log.id}</td>
+                    <td><span class="${levelClass}">${log.level || ''}</span></td>
+                    <td>${escapeHtml(log.username || 'N/A')}</td>
+                    <td>${escapeHtml(log.message || '')}</td>
+                    <td>${contextHtml}</td>
+                    <td>${log.created_at || ''}</td>
+                `;
+                
+                // 添加点击事件查看详情
+                tr.addEventListener('click', () => {
+                    showLogDetail(log);
+                });
+                
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // 根据日志类型简化上下文显示
+        function getSimplifiedContext(logType, contextObj) {
+            if (logType === 'login') {
+                // 登录日志只显示IP
+                if (contextObj.ip) {
+                    return `<span style="color: #666;">${escapeHtml(contextObj.ip)}</span>`;
+                } else if (contextObj.user_agent) {
+                    // 如果没有IP，显示浏览器信息的简化版本
+                    const ua = contextObj.user_agent;
+                    if (ua.includes('Chrome')) return '<span style="color: #666;">Chrome</span>';
+                    if (ua.includes('Firefox')) return '<span style="color: #666;">Firefox</span>';
+                    if (ua.includes('Safari')) return '<span style="color: #666;">Safari</span>';
+                    return '<span style="color: #666;">其他浏览器</span>';
+                }
+            } else if (logType === 'operation') {
+                // 操作日志显示简要信息
+                if (contextObj.id) {
+                    return `<span style="color: #007bff;">ID: ${contextObj.id}</span>`;
+                } else if (contextObj.ids && Array.isArray(contextObj.ids)) {
+                    return `<span style="color: #007bff;">批量操作: ${contextObj.ids.length} 项</span>`;
+                } else if (contextObj.count !== undefined) {
+                    return `<span style="color: #28a745;">数量: ${contextObj.count}</span>`;
+                } else if (contextObj.changes) {
+                    const changeCount = Object.keys(contextObj.changes).length;
+                    return `<span style="color: #ffc107;">修改 ${changeCount} 个字段</span>`;
+                } else if (contextObj.days) {
+                    return `<span style="color: #dc3545;">清理 ${contextObj.days} 天前</span>`;
+                }
+            } else if (logType === 'runtime') {
+                // 运行时日志显示错误类型或状态
+                if (contextObj.error) {
+                    return `<span style="color: #dc3545;">错误</span>`;
+                } else if (contextObj.status) {
+                    return `<span style="color: #28a745;">${escapeHtml(contextObj.status)}</span>`;
+                }
+            }
+            
+            // 默认情况：显示前30个字符，并用省略号
+            const jsonStr = JSON.stringify(contextObj);
+            if (jsonStr.length <= 30) {
+                return `<span style="color: #666;">${jsonStr}</span>`;
+            } else {
+                return `<span style="color: #666;" title="${escapeHtml(jsonStr)}">${jsonStr.substring(0, 30)}...</span>`;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function refreshLogs() {
+            fetchLogs(currentLogType);
+            fetchStatistics();
+        }
+
+        function cleanupLogs() {
+            // 首先检查用户是否有权限
+            fetch('../api/auth/check')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.code !== 0 || !data.data.logged_in) {
+                        alert('请先登录');
+                        return;
+                    }
+                    
+                    const user = data.data.user;
+                    if (user.role !== 'sysadmin' && user.role !== 'admin') {
+                        alert('权限不足，只有管理员以上权限才能清理日志');
+                        return;
+                    }
+                    
+                    // 有权限则继续执行清理操作
+                    if (!confirm('确定要清理30天前的旧日志吗？此操作不可恢复。')) {
+                        return;
+                    }
+
+                    fetch('../api/logs/cleanup?days=30', { method: 'POST' })
+                        .then(res => res.json())
+                        .then(res => {
+                            if (res.code === 0) {
+                                alert(res.msg);
+                                refreshLogs();
+                            } else {
+                                alert('清理失败：' + (res.msg || '未知错误'));
+                            }
+                        })
+                        .catch(err => {
+                            console.error('清理请求失败:', err);
+                            alert('清理请求失败');
+                        });
+                })
+                .catch(err => {
+                    console.error('权限检查失败:', err);
+                    alert('权限检查失败');
+                });
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取当前用户信息并设置权限
+            checkUserPermissions();
+            
+            // 获取统计数据
+            fetchStatistics();
+            
+            // 打开默认标签页
+            const activeTab = document.querySelector('.tab-link.active');
+            if (activeTab) {
+                openTab({ currentTarget: activeTab }, 'operation');
+            }
+            
+            // 每30秒自动刷新统计信息
+            setInterval(fetchStatistics, 30000);
+        });
+
+        // 检查用户权限
+        function checkUserPermissions() {
+            fetch('../api/auth/check')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.code === 0 && data.data.logged_in) {
+                        const user = data.data.user;
+                        // 只有管理员以上权限（sysadmin, admin）才能看到清理按钮
+                        // 网管（netadmin）不能清理日志
+                        const canCleanup = user.role === 'sysadmin' || user.role === 'admin';
+                        const cleanupBtn = document.getElementById('cleanupBtn');
+                        if (cleanupBtn) {
+                            cleanupBtn.style.display = canCleanup ? 'inline-block' : 'none';
+                        }
+                    } else {
+                        // 未登录或获取用户信息失败，隐藏清理按钮
+                        const cleanupBtn = document.getElementById('cleanupBtn');
+                        if (cleanupBtn) {
+                            cleanupBtn.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('获取用户权限失败:', err);
+                    // 出错时隐藏清理按钮
+                    const cleanupBtn = document.getElementById('cleanupBtn');
+                    if (cleanupBtn) {
+                        cleanupBtn.style.display = 'none';
+                    }
+                });
+        }
+
+        // 显示日志详情弹窗
+        function showLogDetail(log) {
+            const modal = document.getElementById('logDetailModal');
+            const content = document.getElementById('logDetailContent');
+            
+            // 格式化上下文数据
+            let contextHtml = '';
+            if (log.context) {
+                try {
+                    const contextObj = JSON.parse(log.context);
+                    contextHtml = `<pre style="background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-break: break-word;">${JSON.stringify(contextObj, null, 2)}</pre>`;
+                } catch (e) {
+                    contextHtml = `<div style="background: #f8f9fa; padding: 15px; border-radius: 4px;">${escapeHtml(log.context)}</div>`;
+                }
+            } else {
+                contextHtml = '<div style="color: #666; font-style: italic;">无上下文信息</div>';
+            }
+
+            // 级别颜色
+            const levelColors = {
+                'info': '#17a2b8',
+                'warning': '#ffc107',
+                'error': '#dc3545'
+            };
+            const levelColor = levelColors[log.level] || '#17a2b8';
+
+            content.innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 100px 1fr; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <strong>ID:</strong>
+                        <span>${log.id}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 100px 1fr; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <strong>级别:</strong>
+                        <span style="color: ${levelColor}; font-weight: bold;">${log.level || 'info'}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 100px 1fr; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <strong>用户:</strong>
+                        <span>${escapeHtml(log.username || 'N/A')}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 100px 1fr; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <strong>时间:</strong>
+                        <span>${log.created_at || ''}</span>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>信息:</strong>
+                        <div style="margin-top: 5px; background: #f8f9fa; padding: 10px; border-radius: 4px;">${escapeHtml(log.message || '')}</div>
+                    </div>
+                    <div>
+                        <strong>上下文:</strong>
+                        <div style="margin-top: 5px;">${contextHtml}</div>
+                    </div>
+                </div>
+            `;
+            
+            modal.style.display = 'block';
+        }
+
+        // 关闭日志详情弹窗
+        function closeLogDetailModal() {
+            const modal = document.getElementById('logDetailModal');
+            modal.style.display = 'none';
+        }
+
+        // 点击弹窗外部区域关闭弹窗
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('logDetailModal');
+            if (event.target === modal) {
+                closeLogDetailModal();
+            }
+        });
+
+        // 按ESC键关闭弹窗
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('logDetailModal');
+                if (modal.style.display === 'block') {
+                    closeLogDetailModal();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

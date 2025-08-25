@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>耗材出库明细</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; background:#f8f9fa; }
+        .container {
+            padding: 24px;
+            width: 100vw;
+            max-width: 100vw;
+            min-width: 800px;
+            margin: 0;
+            box-sizing: border-box;
+        }
+        h2 { margin: 0 0 16px 0; color:#2d3e50; }
+        .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+        .toolbar input, .toolbar button { padding:6px 10px; border:1px solid #ccc; border-radius:4px; font-size:14px; }
+        .toolbar button { background:#ff9800; color:#fff; border:none; cursor:pointer; }
+        .table-wrap { overflow:auto; background:#fff; box-shadow:0 2px 8px #0001; }
+        table {
+            min-width: 800px;
+            width:100%;
+            border-collapse: collapse;
+        }
+        th, td { border:1px solid #e0e0e0; padding:10px 12px; white-space:nowrap; text-align:left; background:#fff; }
+        thead th { position:sticky; top:0; background:#fef6e7; z-index:1; }
+        .pagination-bar { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+        .page-btn { min-width:32px; padding:2px 8px; border:1px solid #e0e0e0; background:#fff; color:#ff9800; border-radius:4px; cursor:pointer; }
+        .page-btn.active { background:#ff9800; color:#fff; font-weight:bold; border-color:#ff9800; }
+        .page-btn:disabled { color:#aaa; background:#f4f6fa; cursor:not-allowed; }
+        .jump-input { width:56px; padding:2px 6px; border-radius:4px; border:1px solid #ccc; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>耗材出库明细</h2>
+    <div class="toolbar">
+        <input type="text" id="kw" placeholder="名称/类型/型号/规格/条码/备注" style="min-width:240px;">
+        <label>开始</label><input type="date" id="start">
+        <label>结束</label><input type="date" id="end">
+        <button id="searchBtn">查询</button>
+    </div>
+    <div class="table-wrap">
+        <table id="outTable">
+            <thead>
+                <tr>
+                    <th style="width:72px;">序号</th>
+                    <th>时间</th>
+                    <th>名称</th>
+                    <th>类型</th>
+                    <th>型号</th>
+                    <th>规格</th>
+                    <th>条码</th>
+                    <th>出库数量</th>
+                    <th>备注</th>
+                    <th>操作人</th>
+                </tr>
+            </thead>
+            <tbody id="outTBody"></tbody>
+        </table>
+    </div>
+    <div class="pagination-bar" id="pager"></div>
+</div>
+<script>
+    let list = [];
+    let currentPage = 1;
+    let pageSize = 20;
+
+    function fetchOutDetail() {
+        const kw = document.getElementById('kw').value.trim();
+        const start = document.getElementById('start').value;
+        const end = document.getElementById('end').value;
+        const qs = new URLSearchParams();
+        if (kw) qs.set('keyword', kw);
+        if (start) qs.set('start', start);
+        if (end) qs.set('end', end);
+
+        fetch('../api/consumable/out-detail' + (qs.toString() ? ('?' + qs.toString()) : ''))
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(res => {
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    list = res.data;
+                } else {
+                    list = [];
+                }
+                currentPage = 1;
+                renderPage();
+            })
+            .catch(() => {
+                list = [];
+                renderPage();
+                alert('获取出库明细失败');
+            });
+    }
+
+    function renderPage() {
+        const tbody = document.getElementById('outTBody');
+        tbody.innerHTML = '';
+        const total = list.length;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        currentPage = Math.min(currentPage, totalPages);
+        const s = (currentPage - 1) * pageSize;
+        const e = Math.min(s + pageSize, total);
+        const pageData = list.slice(s, e);
+
+        pageData.forEach((row, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${s + idx + 1}</td>
+                <td>${row.created_at || ''}</td>
+                <td>${row.name || ''}</td>
+                <td>${row.type || ''}</td>
+                <td>${row.model || ''}</td>
+                <td>${row.spec || ''}</td>
+                <td>${row.barcode || ''}</td>
+                <td>${row.out_count ?? ''}</td>
+                <td>${row.remark || ''}</td>
+                <td>${row.operator || ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        renderPager(totalPages, total);
+    }
+
+    function renderPager(totalPages, total) {
+        const bar = document.getElementById('pager');
+        if (totalPages <= 1) {
+            bar.innerHTML = `共 ${total} 条`;
+            return;
+        }
+        let html = `共 ${total} 条 `;
+        html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoP(1)">首页</button>`;
+        html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="gotoP(${currentPage - 1})">上一页</button>`;
+        const win = 3;
+        const start = Math.max(1, currentPage - win);
+        const end = Math.min(totalPages, currentPage + win);
+        for (let p = start; p <= end; p++) {
+            html += `<button class="page-btn${p===currentPage?' active':''}" onclick="gotoP(${p})">${p}</button>`;
+        }
+        html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoP(${currentPage + 1})">下一页</button>`;
+        html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="gotoP(${totalPages})">末页</button>`;
+        html += `<span style="margin-left:8px;">跳至</span>
+                 <input type="number" id="jp" class="jump-input" min="1" max="${totalPages}" value="${currentPage}">
+                 <button class="page-btn" onclick="jump(${totalPages})">确定</button>`;
+        bar.innerHTML = html;
+        const jp = document.getElementById('jp');
+        if (jp) jp.onkeydown = e => { if (e.key === 'Enter') jump(totalPages); };
+    }
+    window.gotoP = function(p) { currentPage = Math.max(1, p); renderPage(); }
+    window.jump = function(totalPages) {
+        const v = parseInt(document.getElementById('jp').value, 10);
+        if (!v || v < 1 || v > totalPages) return;
+        currentPage = v; renderPage();
+    }
+
+    document.getElementById('searchBtn').onclick = fetchOutDetail;
+    document.addEventListener('DOMContentLoaded', fetchOutDetail);
+</script>
+</body>
+</html>

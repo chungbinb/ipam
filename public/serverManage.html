@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>服务器管理</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f8f9fa; }
+        .container {
+            padding: 40px;
+            width: 100vw;
+            max-width: 100vw;
+            min-width: 800px;
+            margin: 0;
+            box-sizing: border-box;
+        }
+        h1 { font-size: 2rem; color: #2d3e50; margin-bottom: 32px; }
+        .stat-card {
+            flex:1;
+            /* background:#43b1ea; 取消背景色 */
+            padding:24px;
+            border-radius:10px;
+            box-shadow:0 2px 8px #0001;
+            text-align:center;
+            color: #007bff;
+            border: 1px solid #007bff;
+        }
+        .stat-card div:first-child {
+            font-size:32px;
+            font-weight:bold;
+            color:#007bff;
+        }
+        .stat-card div:last-child {
+            color:#007bff;
+            margin-top:8px;
+        }
+        .stat-card.online div:first-child,
+        .stat-card.online div:last-child {
+            color: #43ea7c;
+        }
+        .stat-card.offline div:first-child,
+        .stat-card.offline div:last-child {
+            color: #d9534f;
+        }
+        form { margin-bottom: 20px; }
+        input, select, button { margin-right: 8px; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 15px; }
+        input:focus, select:focus { border-color: #43b1ea; outline: none; }
+        button { background: #43b1ea; color: #fff; border: none; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #007bff; }
+        .table-scroll-x { overflow-x: auto; width: 100%; position: relative; margin-bottom: 0; }
+        .table-scroll-y { max-height: 420px; overflow-y: auto; width: 100%; position: relative; }
+        table.server-table {
+            min-width: 800px;
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 8px #0001;
+            position: relative;
+        }
+        table.server-table th, table.server-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 12px;
+            text-align: left;
+            white-space: nowrap;
+            background: #fff;
+        }
+        table.server-table th {
+            background: #f4f6fa;
+            color: #2d3e50;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        table.server-table th:last-child,
+        table.server-table td.server-action-cell {
+            position: sticky;
+            right: 0;
+            z-index: 11;
+            border-left: none !important;
+            box-shadow: none;
+            background: linear-gradient(to right, #43b1ea 0px, #fff 3px, #fff 6px);
+            text-align: center;
+            min-width: 56px;
+            width: 56px;
+        }
+        .server-action-cell button {
+            background: none !important; /* 删除按钮背景色 */
+            border: none;
+            box-shadow: none;
+        }
+        .action-more-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            position: relative;
+            padding: 0;
+        }
+        .action-more-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px #0001;
+            z-index: 100;
+        }
+        .action-more-menu button {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            border: none;
+            background: none;
+            text-align: left;
+            cursor: pointer;
+            font-size: 15px;
+            color: #007bff;
+        }
+        .action-more-menu button:hover {
+            background: #f4f6fa;
+        }
+        .danger {
+            color: #d9534f;
+        }
+        @media (max-width: 1200px) {
+            .container { padding: 12px; min-width: 800px; }
+            table.server-table { min-width: 800px; }
+        }
+        @media (max-width: 900px) {
+            .container { padding: 4px; min-width: 800px; }
+            table.server-table { min-width: 800px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部统计卡片 -->
+        <div style="display:flex;gap:24px;margin-bottom:32px;">
+            <div class="stat-card">
+                <div id="serverTotal">0</div>
+                <div>服务器数量</div>
+            </div>
+            <div class="stat-card online">
+                <div id="serverOnline">0</div>
+                <div>在线数量</div>
+            </div>
+            <div class="stat-card offline">
+                <div id="serverOffline">0</div>
+                <div>离线数量</div>
+            </div>
+        </div>
+        <!-- 查询表单 -->
+        <form id="serverSearchForm" style="margin-bottom:20px;display:flex;gap:16px;flex-wrap:wrap;">
+            <input type="text" name="hostname" placeholder="主机名">
+            <input type="text" name="ip" placeholder="IP地址">
+            <input type="text" name="os" placeholder="操作系统">
+            <input type="text" name="type" placeholder="类型">
+            <select name="status">
+                <option value="">全部状态</option>
+                <option value="在线">在线</option>
+                <option value="离线">离线</option>
+            </select>
+            <button type="submit">查询</button>
+        </form>
+        <!-- 新增按钮 -->
+        <div style="margin-bottom:12px;">
+            <button id="addServerBtn" style="background:#007bff;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">新增服务器</button>
+        </div>
+        <!-- 服务器列表 -->
+        <div class="table-scroll-x">
+            <div class="table-scroll-y" id="serverTableScrollY">
+                <table class="server-table" id="serverTable">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>主机名</th>
+                            <th>IP地址</th>
+                            <th>操作系统</th>
+                            <th>类型</th>
+                            <th>型号</th>
+                            <th>规格</th>
+                            <th>购买日期</th>
+                            <th>购买价格</th>
+                            <th>使用业务</th>
+                            <th>状态</th>
+                            <th>开放端口</th>
+                            <th>备注</th>
+                            <th style="min-width:56px;width:56px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="serverTableBody">
+                        <!-- 数据行由JS渲染 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- 服务器编辑表单模态框 -->
+        <div id="serverFormModal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:9999;">
+            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:24px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);width:500px;max-height:80vh;overflow-y:auto;">
+                <h3 id="serverFormTitle" style="margin:0 0 20px 0;color:#333;">新增服务器</h3>
+                <form id="serverForm">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                        <div>
+                            <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">主机名 *</label>
+                            <input type="text" name="hostname" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">IP地址 *</label>
+                            <input type="text" name="ip" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                        <div>
+                            <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">操作系统</label>
+                            <input type="text" name="os" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">类型</label>
+                            <select name="type" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                                <option value="">请选择</option>
+                                <option value="Web服务器">Web服务器</option>
+                                <option value="数据库服务器">数据库服务器</option>
+                                <option value="应用服务器">应用服务器</option>
+                                <option value="文件服务器">文件服务器</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                        <div>
+                            <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">型号</label>
+                            <input type="text" name="model" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">状态</label>
+                            <select name="status" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                                <option value="在线">在线</option>
+                                <option value="离线">离线</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">规格</label>
+                        <textarea name="specs" rows="2" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;resize:vertical;"></textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                        <div>
+                            <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">购买日期</label>
+                            <input type="date" name="purchase_date" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">购买价格</label>
+                            <input type="number" name="purchase_price" step="0.01" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">使用业务</label>
+                        <input type="text" name="business_usage" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">开放端口</label>
+                        <input type="text" name="open_ports" placeholder="例如: 22,80,443" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                    </div>
+                    <div style="margin-bottom:20px;">
+                        <label style="display:block;margin-bottom:4px;color:#555;font-size:14px;">备注</label>
+                        <textarea name="remarks" rows="3" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;resize:vertical;"></textarea>
+                    </div>
+                    <div style="display:flex;gap:12px;justify-content:flex-end;">
+                        <button type="button" id="cancelServerForm" style="background:#6c757d;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                        <button type="submit" style="background:#007bff;color:#fff;border:none;padding:8px 20px;border-radius:4px;cursor:pointer;">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 消息弹窗 -->
+        <div id="modalMask" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:9999;">
+            <div id="modalContent" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:32px 24px;border-radius:10px;box-shadow:0 2px 16px #0002;min-width:260px;max-width:320px;text-align:center;">
+                <div id="modalText" style="font-size:18px;margin-bottom:24px;color:#007bff;"></div>
+                <div id="modalActions" style="display:flex;justify-content:center;gap:16px;">
+                    <button id="modalCancelBtn" style="background:#6c757d;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">取消</button>
+                    <button id="modalOkBtn" style="background:#007bff;color:#fff;border:none;padding:8px 24px;border-radius:6px;cursor:pointer;">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 全局变量
+        let serverList = [];
+        let filteredList = [];
+
+        // 获取服务器列表
+        function fetchServerList() {
+            fetch('../api/server')
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0 && Array.isArray(res.data)) {
+                        serverList = res.data;
+                        filteredList = serverList;
+                        renderServerStats(serverList);
+                        renderServerTable(serverList);
+                    } else {
+                        serverList = [];
+                        filteredList = [];
+                        renderServerStats([]);
+                        renderServerTable([]);
+                        console.error('获取服务器列表失败:', res);
+                    }
+                })
+                .catch(err => {
+                    console.error('获取服务器列表异常:', err);
+                    serverList = [];
+                    filteredList = [];
+                    renderServerStats([]);
+                    renderServerTable([]);
+                });
+        }
+
+        function renderServerStats(list) {
+            const total = list.length;
+            const online = list.filter(s => s.status === '在线').length;
+            const offline = list.filter(s => s.status === '离线').length;
+            document.getElementById('serverTotal').innerText = total;
+            document.getElementById('serverOnline').innerText = online;
+            document.getElementById('serverOffline').innerText = offline;
+        }
+
+        // 页面弹窗逻辑
+        function showModal(text, okCallback) {
+            document.getElementById('modalText').innerText = text;
+            document.getElementById('modalMask').style.display = 'block';
+            document.getElementById('modalOkBtn').onclick = function() {
+                document.getElementById('modalMask').style.display = 'none';
+                if (typeof okCallback === 'function') okCallback();
+            };
+            document.getElementById('modalCancelBtn').onclick = function() {
+                document.getElementById('modalMask').style.display = 'none';
+            };
+        }
+        document.getElementById('modalMask').addEventListener('mousedown', function(e) {
+            if (e.target === this) this.style.display = 'none';
+        });
+
+        function renderServerTable(list) {
+            const tbody = document.getElementById('serverTableBody');
+            tbody.innerHTML = '';
+            list.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${idx + 1}</td>
+                    <td>${item.hostname || ''}</td>
+                    <td>${item.ip || ''}</td>
+                    <td>${item.os || ''}</td>
+                    <td>${item.type || ''}</td>
+                    <td>${item.model || ''}</td>
+                    <td>${item.spec || ''}</td>
+                    <td>${item.buy_date || ''}</td>
+                    <td>${item.buy_price || ''}</td>
+                    <td>${item.business || ''}</td>
+                    <td><span style="color: ${item.status === '在线' ? '#28a745' : '#dc3545'}">${item.status || ''}</span></td>
+                    <td>${item.ports || ''}</td>
+                    <td>${item.remark || ''}</td>
+                    <td class="server-action-cell">
+                        <button style="display:inline-flex;align-items:center;gap:4px;color:#007bff;margin-right:8px;" onclick="connectServer(${item.id})">
+                            <span style="width:18px;height:18px;display:inline-block;color:#007bff;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <path d="M5 10h10" stroke="#007bff" stroke-width="2" stroke-linecap="round"/>
+                                    <path d="M13 7l3 3-3 3" stroke="#007bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </span>
+                            <span>连接</span>
+                        </button>
+                        <button style="display:inline-flex;align-items:center;gap:4px;color:#007bff;margin-right:8px;" onclick="editServer(${item.id})">
+                            <span style="width:18px;height:18px;display:inline-block;color:#007bff;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <path d="M4 13.5V16h2.5l9-9-2.5-2.5-9 9z" stroke="#007bff" stroke-width="2" fill="none"/>
+                                    <path d="M13.5 6.5l2 2" stroke="#007bff" stroke-width="2" fill="none"/>
+                                </svg>
+                            </span>
+                            <span>编辑</span>
+                        </button>
+                        <button style="display:inline-flex;align-items:center;gap:4px;color:#007bff;margin-right:8px;" onclick="scanPorts(${item.id})">
+                            <span style="width:18px;height:18px;display:inline-block;color:#007bff;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <rect x="4" y="7" width="12" height="6" rx="2" stroke="#007bff" stroke-width="2" fill="none"/>
+                                    <path d="M8 10h4" stroke="#007bff" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            <span>端口扫描</span>
+                        </button>
+                        <button style="display:inline-flex;align-items:center;gap:4px;color:#d9534f;" onclick="deleteServer(${item.id})">
+                            <span style="width:18px;height:18px;display:inline-block;color:#d9534f;">
+                                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                                    <rect x="5" y="7" width="10" height="8" rx="2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                    <path d="M7 7V5a3 3 0 0 1 6 0v2" stroke="#d9534f" stroke-width="2" fill="none"/>
+                                    <line x1="8" y1="10" x2="8" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                    <line x1="12" y1="10" x2="12" y2="14" stroke="#d9534f" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </span>
+                            <span>删除</span>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 查询表单
+        document.getElementById('serverSearchForm').onsubmit = function(e) {
+            e.preventDefault();
+            const fd = new FormData(this);
+            let filtered = serverList.filter(item => {
+                return (!fd.get('hostname') || item.hostname.includes(fd.get('hostname')))
+                    && (!fd.get('ip') || item.ip.includes(fd.get('ip')))
+                    && (!fd.get('os') || item.os.includes(fd.get('os')))
+                    && (!fd.get('type') || item.type.includes(fd.get('type')))
+                    && (!fd.get('status') || item.status === fd.get('status'));
+            });
+            renderServerStats(filtered);
+            renderServerTable(filtered);
+        };
+
+        // 服务器操作函数
+        function connectServer(id) {
+            fetch(`../api/server/${id}/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) {
+                    showModal('连接操作已记录到日志');
+                } else {
+                    showModal('连接失败: ' + (res.msg || '未知错误'));
+                }
+            })
+            .catch(err => {
+                console.error('连接服务器失败:', err);
+                showModal('连接失败: 网络错误');
+            });
+        }
+
+        function scanPorts(id) {
+            fetch(`../api/server/${id}/scan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.code === 0) {
+                    showModal('端口扫描操作已记录到日志');
+                } else {
+                    showModal('端口扫描失败: ' + (res.msg || '未知错误'));
+                }
+            })
+            .catch(err => {
+                console.error('端口扫描失败:', err);
+                showModal('端口扫描失败: 网络错误');
+            });
+        }
+
+        function editServer(id) {
+            // 从当前列表中找到服务器数据
+            const serverData = serverList.find(s => s.id == id);
+            if (serverData) {
+                // 转换字段名称以匹配表单
+                const formData = {
+                    id: serverData.id,
+                    hostname: serverData.hostname,
+                    ip: serverData.ip,
+                    os: serverData.os,
+                    type: serverData.type,
+                    model: serverData.model,
+                    specs: serverData.spec, // 注意这里字段名的转换
+                    purchase_date: serverData.buy_date,
+                    purchase_price: serverData.buy_price,
+                    business_usage: serverData.business,
+                    status: serverData.status,
+                    open_ports: serverData.ports,
+                    remarks: serverData.remark
+                };
+                openServerForm(formData);
+            } else {
+                showModal('服务器数据未找到');
+            }
+        }
+
+        function deleteServer(id) {
+            const server = serverList.find(s => s.id == id);
+            const serverName = server ? (server.hostname || server.ip) : `ID:${id}`;
+            
+            showModal(`确定要删除服务器 "${serverName}" 吗？`, function() {
+                fetch(`../api/server/${id}`, {
+                    method: 'DELETE'
+                })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.code === 0) {
+                        showModal('删除成功');
+                        fetchServerList();
+                    } else {
+                        showModal('删除失败: ' + (res.msg || '未知错误'));
+                    }
+                })
+                .catch(err => {
+                    console.error('删除服务器失败:', err);
+                    showModal('删除失败: 网络错误');
+                });
+            });
+        }
+
+        // 新增服务器按钮
+        document.getElementById('addServerBtn').onclick = function() {
+            openServerForm();
+        };
+
+        // 打开服务器表单
+        function openServerForm(serverData = null) {
+            const modal = document.getElementById('serverFormModal');
+            const title = document.getElementById('serverFormTitle');
+            const form = document.getElementById('serverForm');
+            
+            form.reset();
+            
+            if (serverData) {
+                title.textContent = '编辑服务器';
+                form.dataset.serverId = serverData.id;
+                
+                // 填充表单数据
+                form.hostname.value = serverData.hostname || '';
+                form.ip.value = serverData.ip || '';
+                form.os.value = serverData.os || '';
+                form.type.value = serverData.type || '';
+                form.model.value = serverData.model || '';
+                form.specs.value = serverData.specs || '';
+                form.purchase_date.value = serverData.purchase_date || '';
+                form.purchase_price.value = serverData.purchase_price || '';
+                form.business_usage.value = serverData.business_usage || '';
+                form.status.value = serverData.status || '在线';
+                form.open_ports.value = serverData.open_ports || '';
+                form.remarks.value = serverData.remarks || '';
+            } else {
+                title.textContent = '新增服务器';
+                delete form.dataset.serverId;
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        // 关闭服务器表单
+        document.getElementById('cancelServerForm').onclick = function() {
+            document.getElementById('serverFormModal').style.display = 'none';
+        };
+
+        // 处理服务器表单提交
+        document.getElementById('serverForm').onsubmit = function(e) {
+            e.preventDefault();
+            
+            const form = e.target;
+            const isEdit = !!form.dataset.serverId;
+            const url = isEdit ? `../api/server/${form.dataset.serverId}` : '../api/server';
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            const formData = new FormData(form);
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(res => {
+                if (res.code === 0) {
+                    showModal(isEdit ? '服务器更新成功' : '服务器创建成功');
+                    document.getElementById('serverFormModal').style.display = 'none';
+                    fetchServerList(); // 刷新列表
+                } else {
+                    showModal('操作失败: ' + (res.msg || '未知错误'));
+                }
+            })
+            .catch(err => {
+                console.error('操作失败:', err);
+                showModal('操作失败: 网络错误');
+            });
+        };
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchServerList();
+        });
+    </script>
+</body>
+</html>

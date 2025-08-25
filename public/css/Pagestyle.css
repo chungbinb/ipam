@@ -1,0 +1,210 @@
+/* 统一页面样式，适用于所有管理页面（如IP段、显示器、笔记本等） */
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    background: #f8f9fa;
+}
+
+.container {
+    padding: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 2rem;
+    color: #2d3e50;
+    margin-bottom: 32px;
+}
+
+.stat-card {
+    flex: 1;
+    background: #007bff;
+    padding: 24px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px #0001;
+    text-align: center;
+    color: #fff;
+}
+
+.stat-card div:first-child {
+    font-size: 32px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.stat-card div:last-child {
+    color: #fff;
+    margin-top: 8px;
+}
+
+form {
+    margin-bottom: 20px;
+}
+
+input, select, button {
+    margin-right: 8px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+}
+
+input:focus, select:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+button {
+    background: #007bff;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+button:hover {
+    background: #0056b3;
+}
+
+.table-scroll-x {
+    overflow-x: auto;
+    width: 100%;
+    position: relative;
+    margin-bottom: 0;
+}
+
+.table-scroll-y {
+    max-height: 420px;
+    overflow-y: auto;
+    width: 100%;
+    position: relative;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%; /* 固定宽度为100%，只随浏览器变化 */
+    min-width: 1200px;
+    margin-bottom: 20px;
+    background: #fff;
+    box-shadow: 0 2px 8px #0001;
+}
+
+th, td {
+    border: 1px solid #e0e0e0;
+    padding: 10px 12px;
+    text-align: left;
+    white-space: nowrap;
+    /* background: #fff; */
+}
+
+th {
+    background: #f4f6fa;
+    color: #2d3e50;
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+th:last-child,
+td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 11;
+    border-left: none !important;
+    box-shadow: none;
+    background: linear-gradient(to right, #007bff 0px, #fff 3px, #fff 6px);
+    text-align: center;
+}
+
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.pagination-bar .page-btn {
+    min-width: 32px;
+    padding: 2px 8px;
+    border: 1px solid #e0e0e0;
+    background: #fff;
+    color: #007bff;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.pagination-bar .page-btn.active {
+    background: #007bff;
+    color: #fff;
+    font-weight: bold;
+    border-color: #007bff;
+}
+
+.pagination-bar .page-btn:disabled {
+    color: #aaa;
+    background: #f4f6fa;
+    cursor: not-allowed;
+}
+
+.pagination-bar .jump-input {
+    width: 48px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+    margin-left: 8px;
+}
+
+.pagination-bar .jump-btn {
+    padding: 2px 10px;
+    border-radius: 4px;
+    border: none;
+    background: #007bff;
+    color: #fff;
+    margin-left: 2px;
+    cursor: pointer;
+}
+
+.danger-btn {
+    background: #d9534f;
+}
+
+.danger-btn:hover {
+    background: #b52a1a;
+}
+
+/* 弹窗样式（右侧抽屉/居中弹窗） */
+.modal-content,
+#addMonitorContent,
+#editMonitorContent,
+#drawerContent,
+#editDrawerContent {
+    background: #fff;
+    padding: 32px 24px;
+    border-radius: 10px;
+    box-shadow: 0 2px 16px #0002;
+    max-width: 400px;
+    margin: 0; /* 保证抽屉弹窗无顶部空隙 */
+    overflow-y: auto;
+}
+
+.modal-actions {
+    text-align: right;
+    margin-top: 16px;
+}
+
+.modal-actions button {
+    margin-left: 8px;
+}
+
+@media (max-width: 800px) {
+    .container { padding: 12px; }
+    .modal-content, #addMonitorContent, #editMonitorContent, #drawerContent, #editDrawerContent {
+        width: 98vw;
+        padding: 12px;
+    }
+}

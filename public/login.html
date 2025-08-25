@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT资产管理系统 - 登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 400px;
+            max-width: 90vw;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        .login-header p {
+            color: #666;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error-message {
+            color: #e74c3c;
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 15px;
+        }
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ccc;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>IT资产管理系统</h1>
+            <p>请输入您的账号信息</p>
+        </div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password" autocorrect="off" spellcheck="false">
+            </div>
+            <button type="submit" class="login-btn" id="loginBtn">登录</button>
+            <div class="loading" id="loading"></div>
+            <div class="error-message" id="errorMessage"></div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            if (!username || !password) {
+                showError('请输入用户名和密码');
+                return;
+            }
+            
+            // 显示加载状态
+            loginBtn.disabled = true;
+            loading.style.display = 'block';
+            errorMessage.textContent = '';
+            
+            // 发送登录请求（不需要处理 session_id，Cookie 会自动设置）
+            fetch('../api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password }),
+                credentials: 'include' // 重要：包含 Cookie
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers.get('content-type'));
+                
+                // 检查响应是否为JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    return response.text().then(text => {
+                        console.error('Non-JSON response:', text);
+                        throw new Error('服务器返回了非JSON格式的响应: ' + text.substring(0, 100));
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Login response:', data);
+                if (data.code === 0) {
+                    // 登录成功，跳转到主页
+                    window.location.href = '/public/index.html';
+                } else {
+                    showError(data.msg || '登录失败');
+                    // 显示更详细的错误信息用于调试
+                    if (data.code === 1 && data.msg === '用户名或密码错误') {
+                        console.log('登录失败：请检查用户名和密码是否正确');
+                        console.log('默认管理员账号：admin / 123456');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('登录错误:', error);
+                showError('网络错误: ' + error.message);
+            })
+            .finally(() => {
+                loginBtn.disabled = false;
+                loading.style.display = 'none';
+            });
+        });
+        
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+        }
+        
+        // 检查是否已经登录
+        fetch('../api/auth/check', {
+            credentials: 'include' // 重要：包含 Cookie
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 0 && data.data.logged_in) {
+                    // 已经登录，跳转到主页
+                    window.location.href = '/public/index.html';
+                }
+            })
+            .catch(error => {
+                // 忽略检查错误
+            });
+    </script>
+</body>
+</html>
