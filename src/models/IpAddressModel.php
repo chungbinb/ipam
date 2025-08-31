@@ -87,5 +87,19 @@ class IpAddressModel {
         $stmt->execute([$segment]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * 更新指定IP的ping状态（用于IP段扫描）
+     * @param int $segmentId IP段ID（这里不使用，保持向后兼容）
+     * @param string $ip IP地址
+     * @param string $pingResult ping结果：'通' 或 '不通'
+     * @return int 受影响的行数
+     */
+    public function updateIpStatus($segmentId, $ip, $pingResult) {
+        $status = ($pingResult === '通') ? '使用中' : '';
+        $stmt = $this->pdo->prepare('UPDATE ip_addresses SET ping = ?, ping_time = ?, status = ? WHERE ip = ?');
+        $stmt->execute([$pingResult, date('Y-m-d H:i:s'), $status, $ip]);
+        return $stmt->rowCount();
+    }
 }
 ?>

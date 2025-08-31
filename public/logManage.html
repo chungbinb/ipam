@@ -137,6 +137,11 @@
         <div class="toolbar">
             <button class="btn" onclick="refreshLogs()">刷新</button>
             <button id="cleanupBtn" class="btn danger" onclick="cleanupLogs()">清理旧日志</button>
+            <button class="btn" onclick="forceRefreshStats()" style="background: #17a2b8;">强制刷新统计</button>
+            <button id="clearFilterBtn" class="btn" onclick="clearFilter()" style="background: #6c757d; display: none;">清除筛选</button>
+            <div id="filterInfo" style="margin-left: auto; color: #666; font-size: 14px; display: none;">
+                <!-- 筛选信息将显示在这里 -->
+            </div>
         </div>
         
         <div class="tabs">
@@ -182,6 +187,7 @@
 
     <script>
         let currentLogType = 'operation';
+        let currentFilter = null; // 当前筛选条件
 
         function openTab(evt, logType) {
             let i, tabcontent, tablinks;
@@ -196,15 +202,33 @@
             document.getElementById(logType).style.display = "block";
             evt.currentTarget.className += " active";
             currentLogType = logType;
-            fetchLogs(logType);
+            
+            // 保持当前筛选条件，但如果是日志类型筛选则清除
+            if (currentFilter && currentFilter.type === 'log_type') {
+                currentFilter = null;
+                clearFilterUI();
+            }
+            
+            fetchLogs(logType, currentFilter);
         }
 
-        function fetchLogs(logType) {
-            fetch('../api/logs?log_type=' + logType)
+        function fetchLogs(logType, filter = null) {
+            let url = '../api/logs?log_type=' + logType;
+            
+            // 添加筛选参数
+            if (filter) {
+                if (filter.type === 'date') {
+                    url += '&date_filter=' + filter.value;
+                } else if (filter.type === 'level') {
+                    url += '&level_filter=' + filter.value;
+                }
+            }
+            
+            fetch(url)
                 .then(res => res.json())
                 .then(res => {
                     if (res.code === 0 && Array.isArray(res.data)) {
-                        renderLogTable(logType, res.data);
+                        renderLogTable(logType, res.data, filter);
                     } else {
                         console.error('获取日志失败:', res);
                     }
@@ -288,36 +312,75 @@
             // 根据卡片类型设置不同的背景颜色和文本颜色
             let backgroundColor = '#007bff';
             let textColor = '#fff'; // 默认白色文本
+            let filterType = null; // 筛选类型
+            let filterValue = null; // 筛选值
             
             if (title.includes('今日')) {
                 backgroundColor = '#28a745'; // 绿色背景
                 textColor = '#fff'; // 白色文本
+                filterType = 'date';
+                filterValue = 'today';
             } else if (title.includes('本周')) {
                 backgroundColor = '#17a2b8'; // 青色背景
                 textColor = '#fff'; // 白色文本
+                filterType = 'date';
+                filterValue = 'this_week';
             } else if (title.includes('操作日志')) {
                 backgroundColor = '#007bff'; // 蓝色背景
                 textColor = '#fff'; // 白色文本
+                filterType = 'log_type';
+                filterValue = 'operation';
             } else if (title.includes('登录日志')) {
                 backgroundColor = '#6610f2'; // 紫色背景
                 textColor = '#fff'; // 白色文本
+                filterType = 'log_type';
+                filterValue = 'login';
             } else if (title.includes('运行日志')) {
                 backgroundColor = '#fd7e14'; // 橙色背景
                 textColor = '#fff'; // 白色文本
+                filterType = 'log_type';
+                filterValue = 'runtime';
             } else if (title.includes('信息日志')) {
                 backgroundColor = '#17a2b8'; // 青色背景
                 textColor = '#fff'; // 白色文本
+                filterType = 'level';
+                filterValue = 'info';
             } else if (title.includes('警告日志')) {
                 backgroundColor = '#ffc107'; // 黄色背景
                 textColor = '#000'; // 黑色文本（黄色背景用黑色文本更清晰）
+                filterType = 'level';
+                filterValue = 'warning';
             } else if (title.includes('错误日志')) {
                 backgroundColor = '#dc3545'; // 红色背景
                 textColor = '#fff'; // 白色文本
+                filterType = 'level';
+                filterValue = 'error';
             }
             
             // 设置卡片的背景色和文本颜色
             card.style.background = backgroundColor;
             card.style.color = textColor;
+            card.style.cursor = 'pointer';
+            card.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+            
+            // 添加悬停效果
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-4px)';
+                card.style.boxShadow = '0 6px 16px rgba(0,0,0,0.25)';
+            });
+            
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(-2px)';
+                card.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+            });
+            
+            // 添加点击事件进行筛选
+            if (filterType && filterValue) {
+                card.addEventListener('click', () => {
+                    filterLogsByCard(filterType, filterValue, title);
+                });
+                card.title = `点击筛选${title}`;
+            }
             
             card.innerHTML = `
                 <h3 style="color: ${textColor}; margin: 0 0 10px 0; font-size: 14px; font-weight: 500;">${title}</h3>
@@ -326,10 +389,13 @@
             return card;
         }
 
-        function renderLogTable(logType, data) {
+        function renderLogTable(logType, data, filter = null) {
             const tableBody = document.querySelector(`#${logType}LogTable tbody`);
             if (!tableBody) return;
             tableBody.innerHTML = '';
+            
+            // 显示筛选提示
+            updateFilterInfo(logType, filter, data.length);
             
             data.forEach(log => {
                 const tr = document.createElement('tr');
@@ -352,13 +418,16 @@
                 // 设置级别样式
                 const levelClass = `level-${log.level || 'info'}`;
                 
+                // 转换时间为本地时区
+                const localTime = formatLocalTime(log.created_at);
+                
                 tr.innerHTML = `
                     <td>${log.id}</td>
                     <td><span class="${levelClass}">${log.level || ''}</td>
                     <td>${escapeHtml(log.username || 'N/A')}</td>
                     <td>${escapeHtml(log.message || '')}</td>
                     <td>${contextHtml}</td>
-                    <td>${log.created_at || ''}</td>
+                    <td>${localTime}</td>
                 `;
                 
                 // 添加点击事件查看详情
@@ -454,8 +523,96 @@
         }
 
         function refreshLogs() {
-            fetchLogs(currentLogType);
+            fetchLogs(currentLogType, currentFilter);
             fetchStatistics();
+        }
+
+        /**
+         * 根据统计卡片进行筛选
+         */
+        function filterLogsByCard(filterType, filterValue, cardTitle) {
+            currentFilter = { type: filterType, value: filterValue, title: cardTitle };
+            
+            if (filterType === 'log_type') {
+                // 如果是日志类型筛选，切换到对应的标签页
+                const tabMap = {
+                    'operation': 'operation',
+                    'login': 'login', 
+                    'runtime': 'runtime'
+                };
+                
+                if (tabMap[filterValue] && tabMap[filterValue] !== currentLogType) {
+                    // 切换标签页
+                    const targetTab = document.querySelector(`[onclick*="${tabMap[filterValue]}"]`);
+                    if (targetTab) {
+                        openTab({ currentTarget: targetTab }, tabMap[filterValue]);
+                        return; // openTab 已经会调用 fetchLogs
+                    }
+                }
+            }
+            
+            // 其他类型的筛选或同标签页的日志类型筛选
+            fetchLogs(currentLogType, currentFilter);
+        }
+
+        /**
+         * 清除筛选
+         */
+        function clearFilter() {
+            currentFilter = null;
+            clearFilterUI();
+            fetchLogs(currentLogType);
+        }
+
+        /**
+         * 清除筛选UI状态
+         */
+        function clearFilterUI() {
+            const clearBtn = document.getElementById('clearFilterBtn');
+            const filterInfo = document.getElementById('filterInfo');
+            
+            if (clearBtn) clearBtn.style.display = 'none';
+            if (filterInfo) filterInfo.style.display = 'none';
+        }
+
+        /**
+         * 更新筛选信息显示
+         */
+        function updateFilterInfo(logType, filter, resultCount) {
+            const clearBtn = document.getElementById('clearFilterBtn');
+            const filterInfo = document.getElementById('filterInfo');
+            
+            if (!filter) {
+                clearFilterUI();
+                return;
+            }
+            
+            // 显示筛选信息
+            let filterText = '';
+            if (filter.type === 'date') {
+                const dateNames = {
+                    'today': '今日',
+                    'this_week': '本周'
+                };
+                filterText = `筛选：${dateNames[filter.value] || filter.value}`;
+            } else if (filter.type === 'level') {
+                const levelNames = {
+                    'info': '信息级别',
+                    'warning': '警告级别',
+                    'error': '错误级别'
+                };
+                filterText = `筛选：${levelNames[filter.value] || filter.value}`;
+            } else if (filter.type === 'log_type') {
+                // 日志类型筛选通过标签页体现，不需要额外显示
+                clearFilterUI();
+                return;
+            }
+            
+            if (filterText) {
+                filterInfo.textContent = `${filterText} (${resultCount} 条结果)`;
+                filterInfo.style.display = 'block';
+                clearBtn.style.display = 'inline-block';
+            }
         }
 
         function cleanupLogs() {
@@ -500,6 +657,40 @@
                 });
         }
 
+        /**
+         * 测试LogService功能
+         */
+        /**
+         * 强制刷新统计数据
+         */
+        function forceRefreshStats() {
+            console.log('强制刷新统计数据...');
+            const container = document.getElementById('statsContainer');
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">正在刷新统计数据...</div>';
+            
+            // 清除可能的缓存
+            fetch('../api/logs/statistics?_t=' + Date.now(), {
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+                .then(res => res.json())
+                .then(res => {
+                    console.log('强制刷新统计结果:', res);
+                    if (res.code === 0) {
+                        renderStatistics(res.data);
+                    } else {
+                        container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">强制刷新失败: ' + (res.msg || '未知错误') + '</div>';
+                    }
+                })
+                .catch(err => {
+                    console.error('强制刷新统计失败:', err);
+                    container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">强制刷新网络错误: ' + err.message + '</div>';
+                });
+        }
+
         // 页面加载时初始化
         document.addEventListener('DOMContentLoaded', function() {
             // 检查协议安全性
@@ -513,11 +704,8 @@
             // 获取统计数据
             fetchStatistics();
             
-            // 打开默认标签页
-            const activeTab = document.querySelector('.tab-link.active');
-            if (activeTab) {
-                openTab({ currentTarget: activeTab }, 'operation');
-            }
+            // 直接加载默认的操作日志数据
+            fetchLogs('operation');
             
             // 每30秒自动刷新统计信息
             setInterval(fetchStatistics, 30000);
@@ -580,6 +768,10 @@
                 'error': '#dc3545'
             };
             const levelColor = levelColors[log.level] || '#17a2b8';
+            
+            // 转换时间为本地时区并显示详细信息
+            const localTime = formatLocalTime(log.created_at);
+            const timeZoneInfo = getTimeZoneInfo();
 
             content.innerHTML = `
                 <div style="margin-bottom: 20px;">
@@ -597,7 +789,7 @@
                     </div>
                     <div style="display: grid; grid-template-columns: 100px 1fr; gap: 10px; align-items: center; margin-bottom: 10px;">
                         <strong>时间:</strong>
-                        <span>${log.created_at || ''}</span>
+                        <span>${localTime} <small style="color: #666;">(${timeZoneInfo})</small></span>
                     </div>
                     <div style="margin-bottom: 15px;">
                         <strong>信息:</strong>
@@ -636,6 +828,70 @@
                 }
             }
         });
+
+        /**
+         * 将UTC时间转换为本地时区时间
+         * @param {string} utcTimeString - UTC时间字符串 (YYYY-MM-DD HH:mm:ss)
+         * @returns {string} 本地时区时间字符串
+         */
+        function formatLocalTime(utcTimeString) {
+            if (!utcTimeString) return '';
+            
+            try {
+                // 将数据库时间字符串转换为Date对象
+                // 假设数据库存储的是UTC时间
+                const utcDate = new Date(utcTimeString + ' UTC');
+                
+                // 如果转换失败，尝试直接解析
+                if (isNaN(utcDate.getTime())) {
+                    const directDate = new Date(utcTimeString);
+                    if (isNaN(directDate.getTime())) {
+                        return utcTimeString; // 如果都失败了，返回原始字符串
+                    }
+                    return directDate.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                    });
+                }
+                
+                // 转换为本地时间字符串
+                return utcDate.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+            } catch (error) {
+                console.error('时间转换错误:', error, '原始时间:', utcTimeString);
+                return utcTimeString;
+            }
+        }
+        
+        /**
+         * 获取当前时区信息
+         * @returns {string} 时区信息字符串
+         */
+        function getTimeZoneInfo() {
+            try {
+                const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const offset = -new Date().getTimezoneOffset() / 60;
+                const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`;
+                return `${timeZone} UTC${offsetStr}`;
+            } catch (error) {
+                // 如果Intl API不可用，使用简单的偏移计算
+                const offset = -new Date().getTimezoneOffset() / 60;
+                const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`;
+                return `UTC${offsetStr}`;
+            }
+        }
     </script>
 </body>
 </html>

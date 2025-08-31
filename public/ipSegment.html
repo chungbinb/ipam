@@ -119,12 +119,13 @@
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 2px 24px #0003;
-            width: 700px;
-            max-width: 96vw;
+            width: max-content;
+            min-width: 700px;
+            max-width: 95vw;
             max-height: 90vh;
             padding: 32px 32px 24px 32px;
             overflow-y: auto;
-            transition: transform 0.4s cubic-bezier(.4,0,.2,1), opacity 0.4s cubic-bezier(.4,0,.2,1);
+            transition: all 0.5s cubic-bezier(.4,0,.2,1);
             opacity: 1;
             transform: translate(-50%, -50%) scale(1);
         }
@@ -135,6 +136,10 @@
         .segment-detail-content.closing {
             opacity: 0;
             transform: translate(-50%, -50%) scale(0.7);
+        }
+        .segment-detail-content.fullscreen-animating {
+            /* 全屏切换动画状态 */
+            transition: all 0.5s cubic-bezier(.4,0,.2,1);
         }
         .segment-detail-modal.show .segment-detail-content:not(.animating):not(.closing) {
             opacity: 1;
@@ -185,14 +190,61 @@
         .status-manual { background: #ff9800; }
         .segment-ip-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(38px, 38px));
             gap: 6px;
             margin: 18px 0 24px 0;
+            justify-content: start;
+            width: 100%;
+            transition: all 0.3s cubic-bezier(.4,0,.2,1);
+        }
+        
+        /* 响应式布局：根据容器宽度智能调整 */
+        @media (min-width: 1600px) {
+            .segment-ip-grid {
+                grid-template-columns: repeat(25, minmax(38px, 38px));
+            }
+        }
+        
+        @media (min-width: 1200px) and (max-width: 1599px) {
+            .segment-ip-grid {
+                grid-template-columns: repeat(20, minmax(38px, 38px));
+            }
+        }
+        
+        @media (min-width: 900px) and (max-width: 1199px) {
+            .segment-detail-content {
+                min-width: 600px;
+            }
+            .segment-ip-grid {
+                grid-template-columns: repeat(15, minmax(38px, 38px));
+            }
+        }
+        
+        @media (min-width: 600px) and (max-width: 899px) {
+            .segment-detail-content {
+                min-width: 500px;
+                max-width: 90vw;
+            }
+            .segment-ip-grid {
+                grid-template-columns: repeat(12, minmax(38px, 38px));
+            }
+        }
+        
+        @media (max-width: 599px) {
+            .segment-detail-content {
+                min-width: 350px;
+                max-width: 95vw;
+                padding: 16px !important;
+            }
+            .segment-ip-grid {
+                grid-template-columns: repeat(8, minmax(38px, 38px));
+            }
         }
         .segment-ip-cell {
             display: flex;
             align-items: center;
             justify-content: center;
+            width: 38px;
             height: 38px;
             border-radius: 8px;
             font-size: 15px;
@@ -200,8 +252,15 @@
             color: #fff;
             background: #6c757d;
             user-select: none;
-            transition: background 0.2s;
+            transition: all 0.2s ease;
             cursor: pointer; /* 新增：鼠标变为手型 */
+        }
+        .segment-ip-cell:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .segment-ip-cell:active {
+            transform: scale(0.95);
         }
         .segment-ip-cell.used { background: #007bff; }
         .segment-ip-cell.manual { background: #ff9800; }
@@ -222,15 +281,46 @@
         @media (max-width: 800px) {
             .segment-detail-content { width: 98vw; padding: 12px; }
         }
+        .segment-detail-modal.fullscreen {
+            z-index: 10000;
+        }
         .segment-detail-modal.fullscreen .segment-detail-content {
-            width: 100vw !important;
-            height: 100vh !important;
-            max-width: none;
-            max-height: none;
-            border-radius: 0;
-            top: 0; left: 0;
-            transform: none;
-            padding: 24px 8px 16px 8px;
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: calc(100vw - 64px) !important;
+            height: calc(100vh - 64px) !important;
+            min-width: unset !important;
+            max-width: none !important;
+            max-height: none !important;
+            border-radius: 12px !important;
+            padding: 32px !important;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
+        }
+        .segment-detail-modal.fullscreen .segment-ip-grid {
+            /* 根据可用宽度动态计算列数 */
+            grid-template-columns: repeat(auto-fill, minmax(38px, 38px)) !important;
+            justify-content: start;
+            max-width: 100%;
+            transition: grid-template-columns 0.3s ease-in-out;
+        }
+        
+        /* 全屏按钮样式优化 */
+        .segment-detail-actions .fullscreen-btn {
+            color: #007bff;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            min-width: 32px;
+            text-align: center;
+        }
+        .segment-detail-actions .fullscreen-btn:hover {
+            background: #e3f2fd;
+            transform: scale(1.05);
+        }
+        .segment-detail-actions .fullscreen-btn:active {
+            transform: scale(0.95);
         }
         .ip-tooltip {
             position: fixed;
@@ -326,7 +416,7 @@
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0,0,0,0.18);
-            z-index: 1000;
+            z-index: 3000;
         }
         .modal-ip-edit.show {
             display: block;
@@ -739,6 +829,10 @@
             currentSegmentId = ipObj.segment_id || ipObj.segmentId || null;
             content.classList.remove('closing');
             modal.classList.add('show');
+            
+            // 确保编辑弹窗在最上层
+            modal.style.zIndex = '3000';
+            
             setTimeout(() => {
                 content.classList.add('active');
             }, 10);
@@ -746,6 +840,14 @@
         function hideEditIpModal() {
             const modal = document.getElementById('editIpModal');
             const content = modal.querySelector('.modal-content-ip');
+            const form = document.getElementById('editIpForm');
+            const submitBtn = form.querySelector('button[type="submit"]');
+            
+            // 重置按钮状态
+            submitBtn.textContent = '保存';
+            submitBtn.disabled = false;
+            submitBtn.style.background = '';
+            
             content.classList.remove('active');
             content.classList.add('closing');
             setTimeout(() => {
@@ -1415,6 +1517,13 @@
     document.getElementById('editIpForm').onsubmit = function(e) {
         e.preventDefault();
         const fd = new FormData(this);
+        
+        // 添加保存中的状态
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = '保存中...';
+        submitBtn.disabled = true;
+        
         fetch('../api/ip-addresses/' + fd.get('id'), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -1432,38 +1541,80 @@
         .then(res => res.json())
         .then(result => {
             if (result.success) {
-                alert('保存成功');
-                hideEditIpModal();
-                fetchIpAddrsForStats().then(() => {
-                    renderIpRangeStats();
-                    // 自动刷新当前IP段详情
-                    if (currentSegmentId) {
-                        window.showIpRange(currentSegmentId);
-                    }
-                });
+                // 显示成功消息，然后自动关闭
+                submitBtn.textContent = '保存成功 ✓';
+                submitBtn.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    hideEditIpModal();
+                    fetchIpAddrsForStats().then(() => {
+                        renderIpRangeStats();
+                        // 自动刷新当前IP段详情
+                        if (currentSegmentId) {
+                            window.showIpRange(currentSegmentId);
+                        }
+                    });
+                }, 800);
             } else {
                 alert(result.message || '保存失败');
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+                submitBtn.style.background = '';
             }
         })
-        .catch(() => alert('网络错误，保存失败'));
+        .catch(() => {
+            alert('网络错误，保存失败');
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+            submitBtn.style.background = '';
+        });
     };
 
     // 关闭详情弹窗动画
     function hideSegmentDetailModal() {
         const modal = document.getElementById('segmentDetailModal');
         const content = modal.querySelector('.segment-detail-content');
+        const fullscreenBtn = document.getElementById('segmentDetailFullscreenBtn');
+        
         content.classList.add('closing');
         setTimeout(() => {
             modal.classList.remove('show');
             modal.classList.remove('fullscreen');
             content.classList.remove('closing');
+            // 重置全屏按钮
+            fullscreenBtn.textContent = '⛶';
+            fullscreenBtn.title = '全屏';
         }, 400); // 动画时长与CSS一致
     }
 
     // 全屏切换
     document.getElementById('segmentDetailFullscreenBtn').onclick = function() {
         const modal = document.getElementById('segmentDetailModal');
-        modal.classList.toggle('fullscreen');
+        const content = modal.querySelector('.segment-detail-content');
+        const fullscreenBtn = this;
+        
+        // 添加动画类
+        content.classList.add('fullscreen-animating');
+        
+        // 切换全屏状态
+        const isFullscreen = modal.classList.contains('fullscreen');
+        
+        if (isFullscreen) {
+            // 退出全屏
+            modal.classList.remove('fullscreen');
+            fullscreenBtn.textContent = '⛶';
+            fullscreenBtn.title = '全屏';
+        } else {
+            // 进入全屏
+            modal.classList.add('fullscreen');
+            fullscreenBtn.textContent = '🗗';
+            fullscreenBtn.title = '退出全屏';
+        }
+        
+        // 动画完成后移除动画类
+        setTimeout(() => {
+            content.classList.remove('fullscreen-animating');
+        }, 500); // 与CSS动画时长一致
     };
     document.getElementById('segmentDetailCloseBtn').onclick = hideSegmentDetailModal;
     document.getElementById('segmentDetailFooterCloseBtn').onclick = hideSegmentDetailModal;

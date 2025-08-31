@@ -153,12 +153,12 @@ class LogService
 
     /**
      * 记录运行时日志
-     * @param string $message 日志信息
      * @param string $level 日志级别
+     * @param string $message 日志信息  
      * @param array $context 上下文信息
      * @return bool
      */
-    public function logRuntime($message, $level = 'info', $context = [])
+    public function logRuntime($level, $message, $context = [])
     {
         $session = $this->sessionModel->getSession();
         $username = $session ? $session['username'] : null;
@@ -188,6 +188,6 @@ class LogService
             ];
         }
 
-        return $this->logRuntime($message, 'error', $context);
+        return $this->logRuntime('error', $message, $context);
     }
 }

@@ -795,35 +795,47 @@
                     }
                     return obj;
                 });
-                // 批量导入（逐条POST，或可改为后端批量接口）
-                let successCount = 0;
-                let failCount = 0;
-                let total = importData.length;
-                let finished = 0;
-                importData.forEach(item => {
-                    fetch('../api/printer', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(item)
-                    })
-                    .then(res => res.json())
-                    .then(res => {
-                        finished++;
-                        if (res.code === 0) successCount++;
-                        else failCount++;
-                        if (finished === total) {
-                            alert(`导入完成：成功${successCount}条，失败${failCount}条`);
+                // 批量导入到后端
+                console.log('准备导入数据:', importData);
+                fetch('../api/printer/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ list: importData })
+                })
+                .then(res => {
+                    console.log('导入响应状态:', res.status);
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                    }
+                    return res.text();
+                })
+                .then(text => {
+                    console.log('导入原始响应:', text);
+                    try {
+                        const res = JSON.parse(text);
+                        console.log('导入解析后响应:', res);
+                        if (res.code === 0) {
+                            let message = `导入完成：成功${res.success}条，失败${res.fail}条`;
+                            if (res.errors && res.errors.length > 0) {
+                                message += '\n\n失败详情:\n' + res.errors.slice(0, 10).join('\n');
+                                if (res.errors.length > 10) {
+                                    message += '\n... 还有 ' + (res.errors.length - 10) + ' 个错误';
+                                }
+                            }
+                            alert(message);
                             fetchPrinterList();
+                        } else {
+                            console.error('导入失败:', res);
+                            alert('导入失败：' + (res.msg || '未知错误'));
                         }
-                    })
-                    .catch(() => {
-                        finished++;
-                        failCount++;
-                        if (finished === total) {
-                            alert(`导入完成：成功${successCount}条，失败${failCount}条`);
-                            fetchPrinterList();
-                        }
-                    });
+                    } catch (e) {
+                        console.error('JSON解析失败:', e, '原始响应:', text);
+                        alert('服务器响应格式错误：' + text.substring(0, 200));
+                    }
+                })
+                .catch(error => {
+                    console.error('导入请求失败:', error);
+                    alert('导入请求失败：' + error.message);
                 });
             };
             reader.readAsArrayBuffer(file);

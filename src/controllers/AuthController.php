@@ -15,9 +15,44 @@ class AuthController
             $this->accountModel = new AccountModel();
             $this->sessionModel = new SessionModel();
             $this->logService = new LogService();
+            error_log("AuthController initialized successfully");
+            
+            // 测试LogService是否可用
+            $this->testLogService();
         } catch (Exception $e) {
             error_log("AuthController initialization failed: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
             throw new Exception("认证控制器初始化失败: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * 测试LogService是否正常工作
+     */
+    private function testLogService()
+    {
+        try {
+            if (!$this->logService) {
+                error_log("LogService is null");
+                return;
+            }
+            
+            // 测试数据库连接
+            error_log("Testing LogService database connection...");
+            
+            // 尝试调用LogService的方法来测试是否正常
+            $reflection = new ReflectionClass($this->logService);
+            error_log("LogService class: " . $reflection->getName());
+            
+            $methods = $reflection->getMethods();
+            $methodNames = array_map(function($method) {
+                return $method->getName();
+            }, $methods);
+            error_log("LogService available methods: " . implode(', ', $methodNames));
+            
+        } catch (Exception $e) {
+            error_log("LogService test failed: " . $e->getMessage());
+            error_log("LogService test stack trace: " . $e->getTraceAsString());
         }
     }
     
@@ -42,6 +77,8 @@ class AuthController
             
             if (!$username || !$password) {
                 error_log("Login failed: empty username or password");
+                // 尝试记录失败日志
+                $this->tryLogLogin($username, false, "空用户名或密码");
                 http_response_code(400);
                 echo json_encode(['code' => 1, 'msg' => '用户名和密码不能为空'], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -55,6 +92,7 @@ class AuthController
             } catch (Exception $e) {
                 error_log("Error finding user: " . $e->getMessage());
                 error_log("Stack trace: " . $e->getTraceAsString());
+                $this->tryLogLogin($username, false, "数据库查询错误: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode(['code' => 1, 'msg' => '数据库查询错误: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -62,11 +100,7 @@ class AuthController
             
             if (!$user) {
                 // 记录登录失败日志
-                try {
-                    $this->logService->logLogin($username, false);
-                } catch (Exception $e) {
-                    error_log("Error logging failed login: " . $e->getMessage());
-                }
+                $this->tryLogLogin($username, false, "用户不存在");
                 http_response_code(401);
                 echo json_encode(['code' => 1, 'msg' => '用户名或密码错误'], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -109,6 +143,7 @@ class AuthController
             } catch (Exception $e) {
                 error_log("Error during password verification: " . $e->getMessage());
                 error_log("Stack trace: " . $e->getTraceAsString());
+                $this->tryLogLogin($username, false, "密码验证错误: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode(['code' => 1, 'msg' => '密码验证错误: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -116,11 +151,7 @@ class AuthController
             
             if (!$isValidPassword) {
                 // 记录密码错误日志
-                try {
-                    $this->logService->logLogin($username, false);
-                } catch (Exception $e) {
-                    error_log("Error logging failed login (wrong password): " . $e->getMessage());
-                }
+                $this->tryLogLogin($username, false, "密码错误");
                 http_response_code(401);
                 echo json_encode(['code' => 1, 'msg' => '用户名或密码错误'], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -130,11 +161,7 @@ class AuthController
             if ($user['status'] !== 'active') {
                 error_log("User account is not active. Status: " . $user['status']);
                 // 记录账号禁用状态登录尝试
-                try {
-                    $this->logService->logLogin($username, false);
-                } catch (Exception $e) {
-                    error_log("Error logging failed login (inactive account): " . $e->getMessage());
-                }
+                $this->tryLogLogin($username, false, "账号状态: " . $user['status']);
                 http_response_code(403);
                 echo json_encode(['code' => 1, 'msg' => '账号已被禁用'], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -152,19 +179,15 @@ class AuthController
             } catch (Exception $e) {
                 error_log("Error creating session: " . $e->getMessage());
                 error_log("Stack trace: " . $e->getTraceAsString());
+                $this->tryLogLogin($username, false, "创建会话失败: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode(['code' => 1, 'msg' => '创建会话失败: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
                 exit;
             }
             
             // 记录登录成功日志
-            try {
-                $this->logService->logLogin($username, true);
-                error_log("Login successful for user: " . $username);
-            } catch (Exception $e) {
-                error_log("Error logging successful login: " . $e->getMessage());
-                // 不中断登录流程，只记录错误
-            }
+            $this->tryLogLogin($username, true, "登录成功");
+            error_log("Login successful for user: " . $username);
             
             echo json_encode([
                 'code' => 0, 
@@ -192,6 +215,9 @@ class AuthController
                 'remote_addr' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
             ]));
             
+            // 尝试记录系统错误日志
+            $this->tryLogLogin($username ?? 'unknown', false, "系统错误: " . $e->getMessage());
+            
             http_response_code(500);
             echo json_encode([
                 'code' => 1, 
@@ -218,7 +244,7 @@ class AuthController
         $this->sessionModel->destroySession();
         
         // 记录注销日志
-        $this->logService->logLogout($username);
+        $this->tryLogLogout($username);
         
         echo json_encode(['code' => 0, 'msg' => '退出成功']);
         exit;
@@ -255,5 +281,207 @@ class AuthController
         if (!headers_sent()) {
             header('Content-Type: application/json');
         }
+    }
+    
+    /**
+     * 安全地尝试记录登录日志
+     */
+    private function tryLogLogin($username, $success, $details = '')
+    {
+        try {
+            error_log("=== 开始记录登录日志 ===");
+            error_log("Attempting to log login: username={$username}, success=" . ($success ? 'true' : 'false') . ", details={$details}");
+            
+            if (!$this->logService) {
+                error_log("ERROR: LogService is not available (null)");
+                $this->fallbackLogLogin($username, $success, $details);
+                return;
+            }
+            
+            // 获取客户端信息
+            $clientInfo = $this->getClientInfo();
+            error_log("Client info: " . json_encode($clientInfo));
+            
+            // 检查LogService是否有logLogin方法
+            if (!method_exists($this->logService, 'logLogin')) {
+                error_log("ERROR: LogService does not have logLogin method");
+                $this->fallbackLogLogin($username, $success, $details);
+                return;
+            }
+            
+            // 调用LogService记录日志
+            error_log("Calling LogService::logLogin...");
+            $result = $this->logService->logLogin($username, $success);
+            error_log("LogService::logLogin result: " . ($result ? 'true' : 'false'));
+            
+            if ($result) {
+                error_log("Login log recorded successfully to database");
+            } else {
+                error_log("Login log recording returned false");
+                $this->fallbackLogLogin($username, $success, $details);
+            }
+            
+        } catch (Exception $e) {
+            error_log("ERROR: Failed to log login attempt: " . $e->getMessage());
+            error_log("LogService error file: " . $e->getFile() . " line: " . $e->getLine());
+            error_log("LogService error stack trace: " . $e->getTraceAsString());
+            
+            // 使用备用日志记录
+            $this->fallbackLogLogin($username, $success, $details);
+        }
+        
+        error_log("=== 登录日志记录完成 ===");
+    }
+    
+    /**
+     * 安全地尝试记录注销日志
+     */
+    private function tryLogLogout($username)
+    {
+        try {
+            error_log("=== 开始记录注销日志 ===");
+            error_log("Attempting to log logout: username={$username}");
+            
+            if (!$this->logService) {
+                error_log("ERROR: LogService is not available (null)");
+                $this->fallbackLogLogout($username);
+                return;
+            }
+            
+            // 检查LogService是否有logLogout方法
+            if (!method_exists($this->logService, 'logLogout')) {
+                error_log("ERROR: LogService does not have logLogout method");
+                $this->fallbackLogLogout($username);
+                return;
+            }
+            
+            // 调用LogService记录日志
+            error_log("Calling LogService::logLogout...");
+            $result = $this->logService->logLogout($username);
+            error_log("LogService::logLogout result: " . ($result ? 'true' : 'false'));
+            
+            if ($result) {
+                error_log("Logout log recorded successfully to database");
+            } else {
+                error_log("Logout log recording returned false");
+                $this->fallbackLogLogout($username);
+            }
+            
+        } catch (Exception $e) {
+            error_log("ERROR: Failed to log logout attempt: " . $e->getMessage());
+            error_log("LogService error file: " . $e->getFile() . " line: " . $e->getLine());
+            error_log("LogService error stack trace: " . $e->getTraceAsString());
+            
+            // 使用备用日志记录
+            $this->fallbackLogLogout($username);
+        }
+        
+        error_log("=== 注销日志记录完成 ===");
+    }
+    
+    /**
+     * 备用登录日志记录（文件日志）
+     */
+    private function fallbackLogLogin($username, $success, $details)
+    {
+        $clientInfo = $this->getClientInfo();
+        $logMessage = date('Y-m-d H:i:s') . " - Login attempt: username={$username}, success=" . ($success ? 'SUCCESS' : 'FAILED') . ", details={$details}, IP={$clientInfo['ip']}, UserAgent={$clientInfo['user_agent']}";
+        error_log("FALLBACK LOGIN LOG: " . $logMessage);
+        
+        // 尝试写入到专门的日志文件
+        $this->writeToLogFile('login', $logMessage);
+    }
+    
+    /**
+     * 备用注销日志记录（文件日志）
+     */
+    private function fallbackLogLogout($username)
+    {
+        $clientInfo = $this->getClientInfo();
+        $logMessage = date('Y-m-d H:i:s') . " - Logout: username={$username}, IP={$clientInfo['ip']}, UserAgent={$clientInfo['user_agent']}";
+        error_log("FALLBACK LOGOUT LOG: " . $logMessage);
+        
+        // 尝试写入到专门的日志文件
+        $this->writeToLogFile('logout', $logMessage);
+    }
+    
+    /**
+     * 获取客户端信息
+     */
+    private function getClientInfo()
+    {
+        return [
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+            'referer' => $_SERVER['HTTP_REFERER'] ?? 'unknown',
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+    }
+    
+    /**
+     * 写入到专门的日志文件
+     */
+    private function writeToLogFile($type, $message)
+    {
+        try {
+            $logDir = __DIR__ . '/../../storage/logs';
+            if (!file_exists($logDir)) {
+                mkdir($logDir, 0755, true);
+            }
+            
+            $logFile = $logDir . '/' . $type . '_' . date('Y-m-d') . '.log';
+            $fullMessage = "[" . date('Y-m-d H:i:s') . "] " . $message . PHP_EOL;
+            
+            file_put_contents($logFile, $fullMessage, FILE_APPEND | LOCK_EX);
+            error_log("Fallback log written to: " . $logFile);
+        } catch (Exception $e) {
+            error_log("Failed to write fallback log file: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * 测试数据库连接和日志表
+     */
+    public function testDatabaseLogging()
+    {
+        $this->setJsonHeader();
+        
+        try {
+            error_log("=== 测试数据库日志功能 ===");
+            
+            // 测试LogService
+            if (!$this->logService) {
+                throw new Exception("LogService not initialized");
+            }
+            
+            // 尝试记录一条测试日志
+            $testResult = $this->logService->logLogin('test_user', true);
+            
+            echo json_encode([
+                'code' => 0,
+                'msg' => '数据库日志测试完成',
+                'data' => [
+                    'logservice_available' => $this->logService ? true : false,
+                    'test_result' => $testResult,
+                    'timestamp' => date('Y-m-d H:i:s')
+                ]
+            ], JSON_UNESCAPED_UNICODE);
+            
+        } catch (Exception $e) {
+            error_log("Database logging test failed: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            
+            http_response_code(500);
+            echo json_encode([
+                'code' => 1,
+                'msg' => '数据库日志测试失败: ' . $e->getMessage(),
+                'debug' => [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
     }
 }

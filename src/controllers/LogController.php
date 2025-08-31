@@ -65,6 +65,69 @@ class LogController
     }
 
     /**
+     * 创建日志记录
+     */
+    public function create()
+    {
+        $this->setJsonHeader();
+        
+        // 检查用户是否已登录
+        $session = $this->sessionModel->getSession();
+        if (!$session) {
+            http_response_code(401);
+            echo json_encode(['code' => 1, 'msg' => '未登录']);
+            exit;
+        }
+
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if (!$input) {
+                echo json_encode(['code' => 1, 'msg' => '无效的JSON数据']);
+                exit;
+            }
+
+            // 验证必需字段
+            if (empty($input['log_type']) || empty($input['level']) || empty($input['message'])) {
+                echo json_encode(['code' => 1, 'msg' => '缺少必需字段']);
+                exit;
+            }
+
+            // 设置用户名
+            $username = $session['username'] ?? 'unknown';
+            
+            // 解析上下文
+            $context = [];
+            if (isset($input['context'])) {
+                if (is_string($input['context'])) {
+                    $context = json_decode($input['context'], true) ?: [];
+                } else {
+                    $context = $input['context'];
+                }
+            }
+
+            // 创建日志记录
+            $result = $this->logModel->create([
+                'log_type' => $input['log_type'],
+                'level' => $input['level'],
+                'message' => $input['message'],
+                'username' => $username,
+                'context' => $context
+            ]);
+
+            if ($result) {
+                echo json_encode(['code' => 0, 'msg' => '日志创建成功']);
+            } else {
+                echo json_encode(['code' => 1, 'msg' => '日志创建失败']);
+            }
+        } catch (\Throwable $e) {
+            error_log('LogController create error: ' . $e->getMessage());
+            echo json_encode(['code' => 1, 'msg' => '服务器错误']);
+        }
+        exit;
+    }
+
+    /**
      * 获取日志统计信息
      */
     public function statistics()

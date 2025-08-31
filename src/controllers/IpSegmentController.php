@@ -326,33 +326,50 @@ class IpSegmentController {
             $successCount = 0;
             $failCount = 0;
             
+            // 生成所有需要扫描的IP地址
+            $ipList = [];
             for ($i = 1; $i <= $hostCount; $i++) {
-                $currentIp = "{$ipParts[0]}.{$ipParts[1]}.{$ipParts[2]}.{$i}";
+                $ipList[] = "{$ipParts[0]}.{$ipParts[1]}.{$ipParts[2]}.{$i}";
+            }
+            
+            // 记录运行日志：开始批量扫描
+            $this->logService->logRuntime(
+                'info',
+                "开始批量扫描IP段: {$segmentIdentifier}，共{$hostCount}个IP",
+                ['segment_id' => $segmentId, 'total_count' => $hostCount, 'action' => 'batch_ping_start']
+            );
+            
+            // 使用并行ping扫描
+            $pingResults = $this->parallelPing($ipList);
+            
+            // 处理扫描结果
+            foreach ($pingResults as $ip => $isSuccess) {
+                $pingResult = $isSuccess ? '通' : '不通';
+                $pingStatus = $isSuccess ? 'success' : 'failed';
                 
-                // 记录运行日志：正在扫描单个IP
-                $this->logService->logRuntime(
-                    'info',
-                    "正在扫描IP: {$currentIp}",
-                    ['segment_id' => $segmentId, 'ip' => $currentIp]
-                );
-
-                // 执行ping操作
-                exec("ping -c 1 -W 1 " . escapeshellarg($currentIp) . " 2>/dev/null", $output, $status);
-                $pingResult = ($status === 0) ? '通' : '不通';
-                
-                if ($status === 0) {
+                if ($isSuccess) {
                     $successCount++;
                 } else {
                     $failCount++;
                 }
 
+                // 记录运行日志：扫描结果
+                $this->logService->logRuntime(
+                    $isSuccess ? 'info' : 'warning',
+                    "扫描IP结果: {$ip} - {$pingResult}",
+                    [
+                        'segment_id' => $segmentId, 
+                        'ip' => $ip, 
+                        'result' => $pingResult,
+                        'status' => $pingStatus,
+                        'action' => 'ping_result'
+                    ]
+                );
+
                 // 更新或创建IP地址记录
                 if (method_exists($this->ipAddressModel, 'updateIpStatus')) {
-                    $this->ipAddressModel->updateIpStatus($segmentId, $currentIp, $pingResult);
+                    $this->ipAddressModel->updateIpStatus($segmentId, $ip, $pingResult);
                 }
-                
-                // 清理输出缓冲
-                $output = [];
             }
             
             // 记录运行日志：扫描完成，包含统计信息
@@ -382,6 +399,144 @@ class IpSegmentController {
         if (!headers_sent()) {
             header('Content-Type: application/json');
         }
+    }
+
+    /**
+     * 并行ping多个IP地址，大幅提升扫描速度
+     * @param array $ipList IP地址列表
+     * @return array 返回IP => 是否ping通的关联数组
+     */
+    private function parallelPing(array $ipList)
+    {
+        $results = [];
+        
+        // 方法1: 尝试使用fping（更高效）
+        if ($this->isFpingAvailable()) {
+            return $this->fpingMethod($ipList);
+        }
+        
+        // 方法2: 使用优化的并行ping
+        return $this->optimizedParallelPing($ipList);
+    }
+    
+    /**
+     * 检查系统是否安装了fping
+     */
+    private function isFpingAvailable()
+    {
+        exec('which fping 2>/dev/null', $output, $returnCode);
+        return $returnCode === 0;
+    }
+    
+    /**
+     * 使用fping进行批量ping（最快的方法）
+     */
+    private function fpingMethod(array $ipList)
+    {
+        $results = [];
+        
+        // 将IP列表写入临时文件
+        $tempFile = tempnam(sys_get_temp_dir(), 'ping_ips_');
+        file_put_contents($tempFile, implode("\n", $ipList));
+        
+        // 使用fping批量ping，超时0.5秒
+        $cmd = "fping -t 500 -f " . escapeshellarg($tempFile) . " 2>&1";
+        exec($cmd, $output, $returnCode);
+        
+        // 解析fping输出
+        foreach ($output as $line) {
+            if (preg_match('/^(\d+\.\d+\.\d+\.\d+)\s+is\s+(alive|unreachable)/', $line, $matches)) {
+                $ip = $matches[1];
+                $status = $matches[2];
+                $results[$ip] = ($status === 'alive');
+            }
+        }
+        
+        // 对于没有结果的IP，标记为不通
+        foreach ($ipList as $ip) {
+            if (!isset($results[$ip])) {
+                $results[$ip] = false;
+            }
+        }
+        
+        // 清理临时文件
+        unlink($tempFile);
+        
+        return $results;
+    }
+    
+    /**
+     * 优化的并行ping实现
+     */
+    private function optimizedParallelPing(array $ipList)
+    {
+        $results = [];
+        $batchSize = 30; // 每批处理30个IP
+        $batches = array_chunk($ipList, $batchSize);
+        
+        foreach ($batches as $batch) {
+            $descriptorspec = [
+                0 => ['pipe', 'r'],  // stdin
+                1 => ['pipe', 'w'],  // stdout
+                2 => ['pipe', 'w']   // stderr
+            ];
+            
+            $processes = [];
+            $pipes = [];
+            
+            // 启动并行ping进程，使用更短的超时时间
+            foreach ($batch as $ip) {
+                // 使用更激进的ping参数：1次ping，0.3秒超时
+                if (stripos(PHP_OS, 'WIN') === 0) {
+                    $cmd = "ping -n 1 -w 300 " . escapeshellarg($ip);
+                } else {
+                    $cmd = "ping -c 1 -W 0.3 -i 0.1 " . escapeshellarg($ip);
+                }
+                
+                $process = proc_open($cmd, $descriptorspec, $pipes[$ip]);
+                
+                if (is_resource($process)) {
+                    $processes[$ip] = $process;
+                    // 关闭stdin
+                    fclose($pipes[$ip][0]);
+                }
+            }
+            
+            // 设置非阻塞模式并等待所有进程完成
+            $timeout = time() + 2; // 最多等待2秒
+            while (!empty($processes) && time() < $timeout) {
+                foreach ($processes as $ip => $process) {
+                    $status = proc_get_status($process);
+                    if (!$status['running']) {
+                        // 进程已完成
+                        $output = stream_get_contents($pipes[$ip][1]);
+                        fclose($pipes[$ip][1]);
+                        fclose($pipes[$ip][2]);
+                        
+                        $exitCode = proc_close($process);
+                        $results[$ip] = ($exitCode === 0);
+                        
+                        unset($processes[$ip]);
+                        unset($pipes[$ip]);
+                    }
+                }
+                
+                if (!empty($processes)) {
+                    usleep(10000); // 等待10ms
+                }
+            }
+            
+            // 清理剩余的进程
+            foreach ($processes as $ip => $process) {
+                proc_terminate($process);
+                fclose($pipes[$ip][1]);
+                fclose($pipes[$ip][2]);
+                proc_close($process);
+                $results[$ip] = false; // 超时的IP标记为不通
+            }
+        }
+        
+        return $results;
     }
 }
 ?>

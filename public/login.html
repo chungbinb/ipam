@@ -262,13 +262,21 @@
             loading.style.display = 'block';
             errorMessage.textContent = '';
             
+            // 获取客户端时区信息用于调试
+            const clientTimeZone = getClientTimeZoneInfo();
+            console.log('客户端时区信息:', clientTimeZone);
+            
             // 发送登录请求
             fetch('../api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ username, password }),
+                body: JSON.stringify({ 
+                    username, 
+                    password,
+                    client_timezone: clientTimeZone // 发送客户端时区信息
+                }),
                 credentials: 'include'
             })
             .then(response => {
@@ -288,6 +296,7 @@
             .then(data => {
                 console.log('Login response:', data);
                 if (data.code === 0) {
+                    console.log('登录成功，客户端时间:', new Date().toLocaleString('zh-CN'));
                     // 登录成功，跳转到主页
                     window.location.href = '/public/index.html';
                 } else {
@@ -308,6 +317,8 @@
                         code: data.code,
                         message: data.msg,
                         timestamp: new Date().toISOString(),
+                        localTime: new Date().toLocaleString('zh-CN'),
+                        timezone: clientTimeZone,
                         username: username
                     });
                 }
@@ -337,6 +348,40 @@
         
         function showError(message) {
             document.getElementById('errorMessage').textContent = message;
+        }
+        
+        /**
+         * 获取客户端时区信息
+         * @returns {object} 时区信息对象
+         */
+        function getClientTimeZoneInfo() {
+            try {
+                const now = new Date();
+                const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const offset = -now.getTimezoneOffset() / 60;
+                const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`;
+                
+                return {
+                    timezone: timeZone,
+                    offset: offset,
+                    offsetString: `UTC${offsetStr}`,
+                    localTime: now.toLocaleString('zh-CN'),
+                    isoTime: now.toISOString()
+                };
+            } catch (error) {
+                // 如果Intl API不可用，使用简单的偏移计算
+                const now = new Date();
+                const offset = -now.getTimezoneOffset() / 60;
+                const offsetStr = offset >= 0 ? `+${offset}` : `${offset}`;
+                
+                return {
+                    timezone: 'Unknown',
+                    offset: offset,
+                    offsetString: `UTC${offsetStr}`,
+                    localTime: now.toLocaleString('zh-CN'),
+                    isoTime: now.toISOString()
+                };
+            }
         }
         
         // 检查是否已经登录

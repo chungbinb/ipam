@@ -31,17 +31,15 @@ class LogModel
             $message = $data['message'] ?? '';
             $username = $data['username'] ?? null;
             $context = $data['context'] ?? [];
-            $userId = $data['user_id'] ?? null;
         } else {
             // 旧的调用方式，保持向后兼容
             $logType = $logTypeOrData;
-            $userId = null;
         }
 
-        $sql = "INSERT INTO logs (log_type, level, message, user_id, username, context) VALUES (?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO logs (log_type, level, message, username, context) VALUES (?, ?, ?, ?, ?)";
         $stmt = $this->pdo->prepare($sql);
         $contextJson = empty($context) ? null : json_encode($context, JSON_UNESCAPED_UNICODE);
-        return $stmt->execute([$logType, $level, $message, $userId, $username, $contextJson]);
+        return $stmt->execute([$logType, $level, $message, $username, $contextJson]);
     }
 
     /**
@@ -57,6 +55,32 @@ class LogModel
         if (!empty($query['log_type'])) {
             $sql .= " AND log_type = ?";
             $params[] = $query['log_type'];
+        }
+
+        // 日期筛选
+        if (!empty($query['date_filter'])) {
+            switch ($query['date_filter']) {
+                case 'today':
+                    $sql .= " AND DATE(created_at) = CURDATE()";
+                    break;
+                case 'this_week':
+                    $sql .= " AND created_at >= DATE_SUB(NOW(), INTERVAL WEEKDAY(NOW()) DAY) 
+                            AND created_at < DATE_ADD(DATE_SUB(NOW(), INTERVAL WEEKDAY(NOW()) DAY), INTERVAL 7 DAY)";
+                    break;
+                case 'yesterday':
+                    $sql .= " AND DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)";
+                    break;
+                case 'last_week':
+                    $sql .= " AND created_at >= DATE_SUB(DATE_SUB(NOW(), INTERVAL WEEKDAY(NOW()) DAY), INTERVAL 7 DAY)
+                            AND created_at < DATE_SUB(NOW(), INTERVAL WEEKDAY(NOW()) DAY)";
+                    break;
+            }
+        }
+
+        // 级别筛选
+        if (!empty($query['level_filter'])) {
+            $sql .= " AND level = ?";
+            $params[] = $query['level_filter'];
         }
 
         $sql .= " ORDER BY id DESC LIMIT 200"; // 默认最多显示最近200条

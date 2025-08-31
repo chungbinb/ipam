@@ -219,32 +219,54 @@ class PrinterController
         exit;
     }
 
-    // 可选：批量导入接口（如需后端批量导入，可添加如下方法）
+    // 批量导入接口
     public function batchImport()
     {
-        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-        $list = isset($input['list']) ? $input['list'] : [];
-        $success = 0;
-        $fail = 0;
-        
-        foreach ($list as $item) {
-            if ($this->model->create($item)) {
-                $success++;
-            } else {
-                $fail++;
+        try {
+            $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+            $list = isset($input['list']) ? $input['list'] : [];
+            
+            error_log('PrinterController batchImport: 收到导入请求，数据条数: ' . count($list));
+            error_log('PrinterController batchImport: 原始数据: ' . json_encode($input, JSON_UNESCAPED_UNICODE));
+            
+            if (empty($list)) {
+                if (!headers_sent()) header('Content-Type: application/json');
+                echo json_encode(['code' => 1, 'msg' => '导入数据为空']);
+                exit;
             }
+            
+            $result = $this->model->batchCreate($list);
+            $success = $result['success'];
+            $fail = $result['failed'];
+            $errors = $result['errors'] ?? [];
+            
+            error_log("PrinterController batchImport: 导入完成，成功: $success, 失败: $fail");
+            if (!empty($errors)) {
+                error_log("PrinterController batchImport: 错误详情: " . json_encode($errors, JSON_UNESCAPED_UNICODE));
+            }
+            
+            // 记录打印机批量导入日志
+            $this->logService->logOperation('batch_import_printer', 'printer', 
+                "批量导入打印机数据: 成功{$success}条, 失败{$fail}条", [
+                'total' => count($list),
+                'success' => $success,
+                'fail' => $fail,
+                'errors' => array_slice($errors, 0, 10) // 只记录前10个错误
+            ]);
+            
+            if (!headers_sent()) header('Content-Type: application/json');
+            echo json_encode([
+                'code' => 0, 
+                'success' => $success, 
+                'fail' => $fail,
+                'errors' => $errors
+            ]);
+        } catch (\Throwable $e) {
+            error_log('PrinterController batchImport exception: ' . $e->getMessage());
+            error_log('PrinterController batchImport stack trace: ' . $e->getTraceAsString());
+            if (!headers_sent()) header('Content-Type: application/json');
+            echo json_encode(['code' => 1, 'msg' => $e->getMessage()]);
         }
-        
-        // 记录打印机批量导入日志
-        $this->logService->logOperation('batch_import_printer', 'printer', 
-            "批量导入打印机数据: 成功{$success}条, 失败{$fail}条", [
-            'total' => count($list),
-            'success' => $success,
-            'fail' => $fail
-        ]);
-        
-        if (!headers_sent()) header('Content-Type: application/json');
-        echo json_encode(['code' => 0, 'success' => $success, 'fail' => $fail]);
         exit;
     }
 }
