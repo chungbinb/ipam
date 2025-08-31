@@ -234,26 +234,99 @@
         }
         .ip-tooltip {
             position: fixed;
-            z-index: 3000;
-            background: #222;
+            background: #333;
             color: #fff;
-            padding: 6px 14px;
+            padding: 8px 12px;
             border-radius: 6px;
-            font-size: 14px;
+            font-size: 12px;
             pointer-events: none;
-            white-space: nowrap;
+            z-index: 9999;
             opacity: 0;
-            transition: opacity 0.15s;
-            box-shadow: 0 2px 8px #0005;
+            transition: opacity 0.2s;
         }
         .ip-tooltip.show {
             opacity: 1;
         }
+        
+        /* 扫描进度弹窗样式 */
+        .scan-progress-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; 
+            width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+        }
+        .scan-progress-modal.show {
+            display: flex;
+        }
+        .scan-progress-content {
+            background: #fff;
+            border-radius: 12px;
+            padding: 32px;
+            min-width: 380px;
+            max-width: 500px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .scan-progress-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .scan-icon {
+            font-size: 24px;
+            animation: scan-rotate 2s linear infinite;
+        }
+        .scan-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #2d3e50;
+        }
+        .scan-progress-body {
+            text-align: center;
+        }
+        #scanProgressText {
+            color: #666;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+        .scan-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .scan-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 4px;
+            width: 0%;
+            animation: scan-progress 3s ease-in-out infinite;
+        }
+        @keyframes scan-rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes scan-progress {
+            0% { width: 0%; }
+            50% { width: 80%; }
+            100% { width: 100%; }
+        }
+        
+        /* 修复编辑IP地址弹窗样式 */
         .modal-ip-edit {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.18); z-index: 3000;
+            background: rgba(0,0,0,0.18);
+            z-index: 1000;
         }
         .modal-ip-edit.show {
             display: block;
@@ -262,215 +335,51 @@
             position: absolute;
             top: 0; right: 0;
             width: 400px; height: 100vh;
-            background: #fff;
-            padding: 32px 24px;
-            border-radius: 10px 0 0 10px;
+            background: #fff; padding: 32px 24px; border-radius: 10px 0 0 10px;
             box-shadow: -2px 0 16px #0002;
             overflow-y: auto;
-            opacity: 0;
             transform: translateX(100%);
-            transition: transform 0.5s cubic-bezier(.4,0,.2,1), opacity 0.4s cubic-bezier(.4,0,.2,1);
+            transition: transform 0.7s cubic-bezier(.4,0,.2,1);
         }
-        .modal-ip-edit.show .modal-content-ip.active {
-            opacity: 1;
+        .modal-content-ip.active {
             transform: translateX(0);
         }
         .modal-content-ip.closing {
-            opacity: 0;
             transform: translateX(100%);
         }
-        .modal-content-ip h3 {
-            margin-top: 0;
-            color: #2d3e50;
-        }
-        .modal-content-ip form {
-            margin: 0;
-        }
-        .modal-content-ip label {
-            font-weight: 500;
-            color: #2d3e50;
-            margin-top: 8px;
-            margin-bottom: 2px;
-            display: block;
-        }
-        .modal-content-ip input[type="text"] {
-            width: 100%;
-            margin-bottom: 12px;
-            padding: 8px 12px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            font-size: 15px;
-            box-sizing: border-box;
-            display: block;
-        }
-        .modal-content-ip input[type="text"]:focus {
-            border-color: #007bff;
-            outline: none;
-        }
-        .modal-content-ip .modal-actions {
-            text-align: right;
-            margin-top: 16px;
-        }
-        .modal-content-ip .modal-actions button {
-            margin-left: 8px;
-            padding: 8px 24px;
-            border-radius: 4px;
-            border: none;
-            font-size: 15px;
-            cursor: pointer;
-            background: #007bff;
-            color: #fff;
-            transition: background 0.2s;
-        }
-        .modal-content-ip .modal-actions button:hover {
-            background: #0056b3;
-        }
-        .modal-content-ip .modal-actions button[style*="background:#6c757d"] {
-            background: #6c757d;
-        }
-        .modal-content-ip .modal-actions button[style*="background:#6c757d"]:hover {
-            background: #495057;
-        }
-        #importIpRangeBtn[disabled] {
-            background: #e0e0e0 !important;
-            color: #aaa !important;
-            cursor: not-allowed !important;
-            border: none;
-        }
-        #importIpRangeBtn[disabled]:hover {
-            cursor: not-allowed !important;
-        }
+        .modal-content-ip h3 { margin-top: 0; color: #2d3e50; }
+        .modal-content-ip label { font-weight: 500; color: #2d3e50; display: block; margin-top: 12px; }
+        .modal-content-ip input, .modal-content-ip select { width: 100%; margin-bottom: 12px; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; }
+        .modal-content-ip .modal-actions { text-align: right; margin-top: 16px; }
+        .modal-content-ip .modal-actions button { margin-left: 8px; }
         .ip-action-btn {
-            background: none !important;
-            border: none !important;
-            color: #007bff !important;
-            font-size: 15px;
+            background: transparent;
+            border: none;
+            color: #007bff;
             cursor: pointer;
-            padding: 2px 8px;
+            padding: 4px;
+            margin: 0 2px;
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            transition: color 0.2s;
-            vertical-align: middle;
+            font-size: 14px;
+            border-radius: 4px;
+            transition: background-color 0.2s, color 0.2s;
         }
-        .ip-action-btn .icon {
-            width: 18px;
-            height: 18px;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 2px;
-            color: #007bff;
+        .ip-action-btn:hover {
+            background-color: #e9ecef;
+            color: #0056b3;
         }
         .ip-action-btn.delete {
-            color: #d9534f !important;
+            color: #d9534f;
         }
-        .ip-action-btn.delete .icon {
-            color: #d9534f !important;
-            fill: #d9534f !important;
+        .ip-action-btn.delete:hover {
+            color: #b52a1a;
+            background-color: #f8d7da;
         }
-        .table-scroll-x {
-            overflow-x: auto;
-            width: 100%;
-            position: relative;
-            margin-bottom: 0;
-        }
-        .table-scroll-y {
-            max-height: 420px;
-            overflow-y: auto;
-            width: 100%;
-            position: relative;
-        }
-        table.ip-segment-table {
-            min-width: 800px;
-            width: 100%;
-            border-collapse: collapse;
-            background: #fff;
-            box-shadow: 0 2px 8px #0001;
-            position: relative;
-        }
-        table.ip-segment-table th, table.ip-segment-table td {
-            border: 1px solid #e0e0e0;
-            padding: 10px 12px;
-            text-align: left;
-            white-space: nowrap;
-            background: #fff;
-        }
-        table.ip-segment-table th {
-            background: #f4f6fa;
-            color: #2d3e50;
-            font-weight: 500;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        table.ip-segment-table th:last-child,
-        table.ip-segment-table td.ip-table-action-cell {
-            position: sticky;
-            right: 0;
-            z-index: 11;
-            border-left: none !important;
-            box-shadow: none;
-            background: linear-gradient(to right, #007bff 0px, #fff 3px, #fff 6px);
-            text-align: center;
-        }
-        table.ip-segment-table th:last-child {
-            background: linear-gradient(to right, #007bff 0px, #fff 3px, #fff 6px);
-            z-index: 12;
-            border-left: none !important;
-            box-shadow: none;
-            text-align: center;
-        }
-        .pagination-bar {
-            display: flex;
+        .ip-action-btn .icon {
+            display: inline-flex;
             align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 8px;
-        }
-        .pagination-bar .page-btn {
-            min-width: 32px;
-            padding: 2px 8px;
-            border: 1px solid #e0e0e0;
-            background: #fff;
-            color: #007bff;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .pagination-bar .page-btn.active {
-            background: #007bff;
-            color: #fff;
-            font-weight: bold;
-            border-color: #007bff;
-        }
-        .pagination-bar .page-btn:disabled {
-            color: #aaa;
-            background: #f4f6fa;
-            cursor: not-allowed;
-        }
-        .pagination-bar .jump-input {
-            width: 48px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            font-size: 15px;
-            margin-left: 8px;
-        }
-        .pagination-bar .jump-btn {
-            padding: 2px 10px;
-            border-radius: 4px;
-            border: none;
-            background: #007bff;
-            color: #fff;
-            margin-left: 2px;
-            cursor: pointer;
-        }
-        @media (max-width: 1200px) {
-            .container { padding: 12px; min-width: 800px; }
-            table.ip-segment-table { min-width: 800px; }
-        }
-        @media (max-width: 900px) {
-            .container { padding: 4px; min-width: 800px; }
-            table.ip-segment-table { min-width: 800px; }
         }
     </style>
 </head>
@@ -598,6 +507,23 @@
         </div>
         <!-- IP格子悬浮提示 -->
         <div id="ipTooltip" class="ip-tooltip"></div>
+        
+        <!-- 扫描进度弹窗 -->
+        <div id="scanProgressModal" class="scan-progress-modal">
+            <div class="scan-progress-content">
+                <div class="scan-progress-header">
+                    <span class="scan-icon">🔍</span>
+                    <span class="scan-title">正在扫描IP段</span>
+                </div>
+                <div class="scan-progress-body">
+                    <div id="scanProgressText">正在扫描中，请稍候...</div>
+                    <div class="scan-progress-bar">
+                        <div class="scan-progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- IP段列表 -->
         <div class="table-scroll-x">
             <div class="table-scroll-y" id="ipSegmentTableScrollY">
@@ -613,7 +539,7 @@
                             <th>VLAN ID</th>
                             <th>网段标识</th>
                             <th>备注</th>
-                            <th style="min-width:180px;">操作</th>
+                            <th style="min-width:160px;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="ipRangeTableBody">
@@ -653,7 +579,7 @@
                     <label>使用人</label>
                     <input type="text" name="user">
                     <label>资产编号</label>
-                    <input type="text" name="asset_number" id="assetNumberInput">
+                    <input type="text" name="asset_number">
                     <label>手动标记</label>
                     <select name="manual">
                         <option value="">无</option>
@@ -1018,14 +944,7 @@
             // 重置表单内容
             const form = document.getElementById('addIpRangeForm');
             form.reset();
-            // 先移除动画类，确保每次都能触发动画
-            const modal = document.getElementById('addModal');
-            const content = modal.querySelector('.modal-content');
-            content.classList.remove('active');
-            modal.classList.add('show');
-            setTimeout(() => {
-                content.classList.add('active');
-            }, 10);
+            showModal('addModal');
         };
         document.getElementById('cancelAddBtn').onclick = function() {
             hideModal('addModal');
@@ -1125,7 +1044,55 @@
         });
     });
 
-    window.scanIp = function(id) { alert('扫描IP段ID: ' + id); };
+    window.scanIp = function(id) {
+        const segmentObj = ipRangeList.find(item => item.id == id);
+        if (!segmentObj) {
+            alert('找不到IP段信息');
+            return;
+        }
+        
+        if (!confirm(`确定要扫描IP段 ${segmentObj.segment}/${segmentObj.mask} 吗？`)) {
+            return;
+        }
+        
+        // 提示用户后台扫描中
+        alert('后台扫描任务已启动，请稍后刷新页面或点击“显示”查看最新状态。');
+
+        // 新增：记录操作日志
+        fetch('../api/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                log_type: 'operation',
+                level: 'info',
+                message: `请求扫描IP段: ${segmentObj.segment}/${segmentObj.mask}`,
+                context: JSON.stringify({ segment_id: id, segment: segmentObj.segment, mask: segmentObj.mask })
+            })
+        }).catch(err => console.error('记录操作日志失败:', err));
+
+        // 开始扫描，无需等待结果
+        fetch('../api/ping-ip-segment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ segment_id: id })
+        })
+        .then(res => res.json())
+        .then(result => {
+            // 可以在控制台输出成功信息，但不打扰用户
+            if (result.success) {
+                console.log(`IP段 ${segmentObj.segment} 扫描完成。`);
+                // 可以在这里静默刷新数据，以便用户下次查看时是新的
+                fetchIpAddrsForStats().then(() => {
+                    renderIpRangeStats();
+                });
+            } else {
+                console.error(`IP段 ${segmentObj.segment} 扫描失败: ${result.message}`);
+            }
+        })
+        .catch(err => {
+            console.error(`IP段 ${segmentObj.segment} 扫描请求失败:`, err);
+        });
+    };
 
     // 修正显示按钮绑定为弹窗
     window.showIpRange = function(id) {
@@ -1195,11 +1162,13 @@
                         hostname = ipObj.hostname || '';
                         user = ipObj.user || '';
                         
-                        // 判断IP状态
+                        // 判断IP状态：手动标记优先，然后是ping状态，最后是其他状态
                         if (ipObj.manual !== null && ipObj.manual !== undefined && ipObj.manual !== '') {
-                            cellClass = 'manual';
+                            cellClass = 'manual'; // 橙色：手动标记
+                        } else if (ipObj.ping === '通' || ipObj.status === '使用中') {
+                            cellClass = 'used'; // 蓝色：ping通或使用中
                         } else if (ipObj.status && ipObj.status.includes('分配')) {
-                            cellClass = 'used';
+                            cellClass = 'used'; // 蓝色：已分配
                         }
                     }
                     // 增加 data-ip、data-hostname、data-user 属性
@@ -1278,28 +1247,7 @@
         setTimeout(() => {
             content.classList.remove('animating');
         }, 10); // 10ms后移除，触发transition到正常状态
-    };
-
-    // 修正新增按钮绑定弹窗逻辑，始终显示弹窗并重置动画
-    document.addEventListener('DOMContentLoaded', function() {
-        document.getElementById('addIpRangeBtn').onclick = function() {
-            fillMaskSelect();
-            // 重置表单内容
-            const form = document.getElementById('addIpRangeForm');
-            form.reset();
-            // 先移除动画类，确保每次都能触发动画
-            const modal = document.getElementById('addModal');
-            const content = modal.querySelector('.modal-content');
-            content.classList.remove('active');
-            modal.classList.add('show');
-            setTimeout(() => {
-                content.classList.add('active');
-            }, 10);
-        };
-        document.getElementById('cancelAddBtn').onclick = function() {
-            hideModal('addModal');
-        };
-    });
+    }
 
     // 修正编辑按钮弹窗逻辑
     window.editIpRange = function(id) {
@@ -1405,7 +1353,7 @@
         .then(result => {
             if (result.success) {
                 // 页面弹窗提示
-                document.getElementById('addModal').classList.remove('show');
+                hideModal('addModal');
                 document.getElementById('successModal').style.display = 'block';
                 fetchIpRanges(); // 新增后重新加载数据
             } else {
@@ -1433,6 +1381,19 @@
     }
     function hideIpTooltip() {
         ipTooltip.classList.remove('show');
+    }
+    
+    // 扫描进度弹窗函数
+    function showScanProgressModal(segmentObj) {
+        const modal = document.getElementById('scanProgressModal');
+        const progressText = document.getElementById('scanProgressText');
+        progressText.textContent = `正在扫描 ${segmentObj.segment}/${segmentObj.mask}，请稍候...`;
+        modal.classList.add('show');
+    }
+    
+    function hideScanProgressModal() {
+        const modal = document.getElementById('scanProgressModal');
+        modal.classList.remove('show');
     }
 
     // 获取资产编号列表并渲染到下拉框
@@ -1487,30 +1448,30 @@
         .catch(() => alert('网络错误，保存失败'));
     };
 
-        // 关闭详情弹窗动画
-        function hideSegmentDetailModal() {
-            const modal = document.getElementById('segmentDetailModal');
-            const content = modal.querySelector('.segment-detail-content');
-            content.classList.add('closing');
-            setTimeout(() => {
-                modal.classList.remove('show');
-                modal.classList.remove('fullscreen');
-                content.classList.remove('closing');
-            }, 400); // 动画时长与CSS一致
-        }
+    // 关闭详情弹窗动画
+    function hideSegmentDetailModal() {
+        const modal = document.getElementById('segmentDetailModal');
+        const content = modal.querySelector('.segment-detail-content');
+        content.classList.add('closing');
+        setTimeout(() => {
+            modal.classList.remove('show');
+            modal.classList.remove('fullscreen');
+            content.classList.remove('closing');
+        }, 400); // 动画时长与CSS一致
+    }
 
-        // 全屏切换
-        document.getElementById('segmentDetailFullscreenBtn').onclick = function() {
-            const modal = document.getElementById('segmentDetailModal');
-            modal.classList.toggle('fullscreen');
-        };
-        document.getElementById('segmentDetailCloseBtn').onclick = hideSegmentDetailModal;
-        document.getElementById('segmentDetailFooterCloseBtn').onclick = hideSegmentDetailModal;
+    // 全屏切换
+    document.getElementById('segmentDetailFullscreenBtn').onclick = function() {
+        const modal = document.getElementById('segmentDetailModal');
+        modal.classList.toggle('fullscreen');
+    };
+    document.getElementById('segmentDetailCloseBtn').onclick = hideSegmentDetailModal;
+    document.getElementById('segmentDetailFooterCloseBtn').onclick = hideSegmentDetailModal;
 
-        // 点击遮罩关闭弹窗
-        document.getElementById('segmentDetailModal').addEventListener('mousedown', function(e) {
-            if (e.target === this) hideSegmentDetailModal();
-        });
+    // 点击遮罩关闭弹窗
+    document.getElementById('segmentDetailModal').addEventListener('mousedown', function(e) {
+        if (e.target === this) hideSegmentDetailModal();
+    });
     </script>
 </body>
 </html>

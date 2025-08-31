@@ -14,19 +14,34 @@ class LogModel
 
     /**
      * 创建一条日志
-     * @param string $logType 日志类型: operation, login, runtime
+     * @param mixed $logTypeOrData 日志类型 或 包含完整日志数据的数组
      * @param string $level 日志级别: info, warning, error
      * @param string $message 日志信息
      * @param string|null $username 操作用户名
      * @param array $context 附加上下文信息
      * @return bool
      */
-    public function create($logType, $level, $message, $username = null, $context = [])
+    public function create($logTypeOrData, $level = null, $message = null, $username = null, $context = [])
     {
-        $sql = "INSERT INTO logs (log_type, level, message, username, context) VALUES (?, ?, ?, ?, ?)";
+        // 兼容新的数组参数和旧的多参数调用方式
+        if (is_array($logTypeOrData)) {
+            $data = $logTypeOrData;
+            $logType = $data['log_type'] ?? 'runtime';
+            $level = $data['level'] ?? 'info';
+            $message = $data['message'] ?? '';
+            $username = $data['username'] ?? null;
+            $context = $data['context'] ?? [];
+            $userId = $data['user_id'] ?? null;
+        } else {
+            // 旧的调用方式，保持向后兼容
+            $logType = $logTypeOrData;
+            $userId = null;
+        }
+
+        $sql = "INSERT INTO logs (log_type, level, message, user_id, username, context) VALUES (?, ?, ?, ?, ?, ?)";
         $stmt = $this->pdo->prepare($sql);
         $contextJson = empty($context) ? null : json_encode($context, JSON_UNESCAPED_UNICODE);
-        return $stmt->execute([$logType, $level, $message, $username, $contextJson]);
+        return $stmt->execute([$logType, $level, $message, $userId, $username, $contextJson]);
     }
 
     /**

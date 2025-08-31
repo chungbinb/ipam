@@ -51,7 +51,9 @@ $requestUri = strtok($_SERVER['REQUEST_URI'], '?');
 
 // 新增：简易处理 favicon，避免 404
 if ($requestUri === '/favicon.ico') {
-    http_response_code(204);
+    header('Content-Type: image/x-icon');
+    // 返回一个1x1像素的透明图标
+    echo base64_decode('AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAABILAAASCwAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAA=');
     exit;
 }
 
@@ -204,6 +206,9 @@ try {
             } elseif ($requestUri === '/api/ping-ip-batch') {
                 $authMiddleware->checkAuth(); // 新增验证
                 $ipAddressController->pingIpBatch();
+            } elseif ($requestUri === '/api/ping-ip-segment') {
+                $authMiddleware->checkAuth(); // 新增验证
+                $ipAddressController->pingIpSegment();
             } elseif ($requestUri === '/api/monitor') {
                 $authMiddleware->checkAuth(); // 新增验证
                 $monitorController->create();
@@ -270,6 +275,9 @@ try {
             } elseif ($requestUri === '/api/logs/cleanup') {
                 $authMiddleware->checkAuth(); // 新增验证
                 $logController->cleanup();
+            } elseif ($requestUri === '/api/logs') {
+                $authMiddleware->checkAuth(); // 新增验证
+                $logController->create();
             } else {
                 http_response_code(404);
                 echo json_encode(['message' => 'Not Found']);

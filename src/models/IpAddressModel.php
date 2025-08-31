@@ -81,5 +81,11 @@ class IpAddressModel {
         $stmt->execute([$segment]);
         return $stmt->rowCount();
     }
+
+    public function getBySegment($segment) {
+        $stmt = $this->pdo->prepare('SELECT * FROM ip_addresses WHERE segment = ? ORDER BY INET_ATON(ip)');
+        $stmt->execute([$segment]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 ?>

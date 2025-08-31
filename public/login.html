@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IT资产管理系统 - 登录</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23007bff' d='M12 2L2 7v10c0 5.55 3.84 9.739 9 11 5.16-1.261 9-5.45 9-11V7l-10-5z'/></svg>">
+    <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
     <style>
         * {
             margin: 0;
@@ -12,32 +14,74 @@
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1d74b2 0%, #0056b3 100%);
             min-height: 100vh;
+            overflow: hidden;
+        }
+        .page-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+        }
+        .left-panel {
+            width: 45%;
+            max-width: 500px;
+            height: 80vh;
+            max-height: 600px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-around;
+            padding: 40px;
+            text-align: center;
+        }
+        .left-panel .graphic {
+            margin-top: 20px;
+            opacity: 0.8;
+            width: 100%;
+            max-width: 350px;
+        }
+        .left-panel h2 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .left-panel p {
+            font-size: 16px;
+            max-width: 400px;
+            opacity: 0.9;
+        }
+        .right-panel {
+            width: 45%;
+            max-width: 480px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .login-container {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
             padding: 40px;
-            width: 400px;
+            width: 100%;
             max-width: 90vw;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         .login-header {
             text-align: center;
             margin-bottom: 30px;
         }
         .login-header h1 {
-            color: #333;
+            color: #fff;
             font-size: 28px;
             margin-bottom: 8px;
         }
         .login-header p {
-            color: #666;
+            color: rgba(255, 255, 255, 0.8);
             font-size: 14px;
         }
         .form-group {
@@ -46,38 +90,47 @@
         .form-group label {
             display: block;
             margin-bottom: 5px;
-            color: #333;
+            color: #fff;
             font-weight: 500;
         }
         .form-group input {
             width: 100%;
             padding: 12px 16px;
-            border: 2px solid #e1e5e9;
+            border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 10px;
             font-size: 16px;
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, background-color 0.3s;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
         }
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #fff;
+            background: rgba(255, 255, 255, 0.2);
         }
         .login-btn {
             width: 100%;
             padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #59cba0 0%, #59cba0 100%);
             color: white;
             border: none;
             border-radius: 10px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.3s;
         }
         .login-btn:hover {
+            background: linear-gradient(135deg, #7ad5b3 0%, #7ad5b3 100%);
             transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
         .login-btn:disabled {
-            opacity: 0.6;
+            background: #6c757d;
+            opacity: 0.8;
             cursor: not-allowed;
             transform: none;
         }
@@ -98,7 +151,7 @@
             width: 20px;
             height: 20px;
             border: 2px solid #ccc;
-            border-top: 2px solid #667eea;
+            border-top: 2px solid #007bff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -106,27 +159,87 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        @media (max-width: 900px) {
+            .page-container {
+                flex-direction: column;
+                justify-content: flex-start;
+            }
+            .left-panel, .right-panel {
+                width: 100%;
+                max-width: none;
+            }
+            .left-panel {
+                height: auto;
+                min-height: 30vh;
+                justify-content: center;
+                padding: 40px 20px;
+            }
+            .left-panel .graphic {
+                display: none;
+            }
+            .left-panel h2 {
+                font-size: 24px;
+            }
+            .right-panel {
+                height: auto;
+                align-items: flex-start;
+                padding: 40px 20px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-header">
-            <h1>IT资产管理系统</h1>
-            <p>请输入您的账号信息</p>
+    <div class="page-container">
+        <div class="left-panel">
+            <div>
+                <h2>森森IT资产运维管理平台</h2>
+                <p>高效、智能、可靠的IT资产解决方案</p>
+            </div>
+            <div class="graphic">
+                <svg width="100%" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:rgba(255,255,255,0.4);stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:rgba(255,255,255,0.1);stop-opacity:1" />
+                        </linearGradient>
+                        <filter id="f1" x="-0.5" y="-0.5" width="2" height="2">
+                            <feGaussianBlur in="SourceGraphic" stdDeviation="5" />
+                        </filter>
+                    </defs>
+                    <rect x="50" y="50" width="300" height="200" rx="20" fill="url(#grad1)" />
+                    <circle cx="100" cy="100" r="80" fill="rgba(255,255,255,0.1)" filter="url(#f1)" />
+                    <path d="M 150,80 Q 250,150 150,220" stroke="rgba(255,255,255,0.5)" stroke-width="10" fill="none" stroke-linecap="round" />
+                    <path d="M 250,80 Q 150,150 250,220" stroke="rgba(255,255,255,0.5)" stroke-width="10" fill="none" stroke-linecap="round" />
+                    <g transform="translate(280, 200) rotate(-30)">
+                        <rect x="0" y="0" width="80" height="80" rx="10" fill="rgba(255,255,255,0.2)" />
+                        <line x1="10" y1="20" x2="70" y2="20" stroke="white" stroke-width="4" stroke-linecap="round" />
+                        <line x1="10" y1="40" x2="70" y2="40" stroke="white" stroke-width="4" stroke-linecap="round" />
+                        <line x1="10" y1="60" x2="40" y2="60" stroke="white" stroke-width="4" stroke-linecap="round" />
+                    </g>
+                </svg>
+            </div>
         </div>
-        <form id="loginForm">
-            <div class="form-group">
-                <label for="username">用户名</label>
-                <input type="text" id="username" name="username" required autocomplete="username">
+        <div class="right-panel">
+            <div class="login-container">
+                <div class="login-header">
+                    <h1>系统登录</h1>
+                    <p>请输入您的账号信息</p>
+                </div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="username">用户名</label>
+                        <input type="text" id="username" name="username" required autocomplete="username" placeholder="请输入用户名">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">密码</label>
+                        <input type="password" id="password" name="password" required autocomplete="current-password" autocorrect="off" spellcheck="false" placeholder="请输入密码">
+                    </div>
+                    <button type="submit" class="login-btn" id="loginBtn">登录</button>
+                    <div class="loading" id="loading"></div>
+                    <div class="error-message" id="errorMessage"></div>
+                </form>
             </div>
-            <div class="form-group">
-                <label for="password">密码</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password" autocorrect="off" spellcheck="false">
-            </div>
-            <button type="submit" class="login-btn" id="loginBtn">登录</button>
-            <div class="loading" id="loading"></div>
-            <div class="error-message" id="errorMessage"></div>
-        </form>
+        </div>
     </div>
 
     <script>
@@ -149,14 +262,14 @@
             loading.style.display = 'block';
             errorMessage.textContent = '';
             
-            // 发送登录请求（不需要处理 session_id，Cookie 会自动设置）
+            // 发送登录请求
             fetch('../api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ username, password }),
-                credentials: 'include' // 重要：包含 Cookie
+                credentials: 'include'
             })
             .then(response => {
                 console.log('Response status:', response.status);
@@ -178,17 +291,43 @@
                     // 登录成功，跳转到主页
                     window.location.href = '/public/index.html';
                 } else {
-                    showError(data.msg || '登录失败');
-                    // 显示更详细的错误信息用于调试
-                    if (data.code === 1 && data.msg === '用户名或密码错误') {
-                        console.log('登录失败：请检查用户名和密码是否正确');
-                        console.log('默认管理员账号：admin / 123456');
+                    let errorMsg = data.msg || '登录失败';
+                    if (data.code === 1) {
+                        if (data.msg === '登录过程中发生错误') {
+                            errorMsg = '服务器内部错误，请联系管理员检查后端日志';
+                        } else if (data.msg === '用户名或密码错误') {
+                            errorMsg = '用户名或密码错误，请检查后重试';
+                        } else if (data.msg.includes('账号')) {
+                            errorMsg = '账号状态异常，请联系管理员';
+                        }
                     }
+                    showError(errorMsg);
+                    
+                    // 显示更详细的错误信息用于调试
+                    console.log('登录失败详情:', {
+                        code: data.code,
+                        message: data.msg,
+                        timestamp: new Date().toISOString(),
+                        username: username
+                    });
                 }
             })
             .catch(error => {
                 console.error('登录错误:', error);
-                showError('网络错误: ' + error.message);
+                let errorMessage = '网络错误: ' + error.message;
+                
+                // 检测常见的网络问题
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage = '无法连接到服务器，请检查网络连接或联系管理员';
+                } else if (error.message.includes('500')) {
+                    errorMessage = '服务器内部错误，数据库连接可能存在问题';
+                } else if (error.message.includes('404')) {
+                    errorMessage = '登录接口不存在，请检查服务器配置';
+                } else if (error.message.includes('database')) {
+                    errorMessage = '数据库连接错误，请联系管理员';
+                }
+                
+                showError(errorMessage);
             })
             .finally(() => {
                 loginBtn.disabled = false;

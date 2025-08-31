@@ -119,5 +119,67 @@ class IpAddressController {
         echo json_encode(['success' => true]);
         exit;
     }
+
+    public function pingIpSegment() {
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $segmentId = $input['segment_id'] ?? 0;
+        
+        if (!$segmentId) {
+            if (!headers_sent()) header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'IP段ID不能为空']);
+            exit;
+        }
+        
+        // 获取IP段信息
+        require_once __DIR__ . '/../models/IpSegmentModel.php';
+        $segmentModel = new IpSegmentModel();
+        $segment = $segmentModel->getById($segmentId);
+        
+        if (!$segment) {
+            if (!headers_sent()) header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'IP段不存在']);
+            exit;
+        }
+        
+        // 获取该IP段下的所有IP地址
+        $segmentPrefix = $segment['segment']; // 例如: 192.168.1
+        $list = $this->model->getBySegment($segmentPrefix);
+        
+        $pingCount = 0;
+        $successCount = 0;
+        
+        foreach ($list as $row) {
+            $ip = $row['ip'] ?? '';
+            $id = $row['id'] ?? 0;
+            $pingCount++;
+            
+            $success = false;
+            if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
+                if (stripos(PHP_OS, 'WIN') === 0) {
+                    $cmd = "ping -n 1 -w 2000 " . escapeshellarg($ip);
+                } else {
+                    $cmd = "ping -c 1 -W 2 " . escapeshellarg($ip);
+                }
+                @exec($cmd, $out, $status);
+                $success = ($status === 0);
+                if ($success) $successCount++;
+            }
+            
+            $this->model->updatePingStatus($id, [
+                'ping' => $success ? '通' : '不通',
+                'ping_time' => date('Y-m-d H:i:s'),
+                'status' => $success ? '使用中' : ($row['status'] ?? '')
+            ]);
+        }
+        
+        if (!headers_sent()) header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'total' => $pingCount,
+            'success_count' => $successCount,
+            'message' => "扫描完成：共ping了{$pingCount}个IP，{$successCount}个通达"
+        ]);
+        exit;
+    }
 }
 ?>

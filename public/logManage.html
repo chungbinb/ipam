@@ -14,6 +14,15 @@
             margin: 0;
             box-sizing: border-box;
         }
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
         .stats-container { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
@@ -113,6 +122,11 @@
 <body>
     <div class="container">
         <h1 style="font-size: 2rem; color: #2d3e50; margin-bottom: 32px;">日志管理</h1>
+        
+        <!-- 安全提示 -->
+        <div class="security-notice" id="securityNotice" style="display: none;">
+            <strong>安全提示：</strong> 检测到您正在使用HTTP协议访问系统，建议使用HTTPS协议以确保数据传输安全。
+        </div>
         
         <!-- 统计信息 -->
         <div class="stats-container" id="statsContainer">
@@ -340,7 +354,7 @@
                 
                 tr.innerHTML = `
                     <td>${log.id}</td>
-                    <td><span class="${levelClass}">${log.level || ''}</span></td>
+                    <td><span class="${levelClass}">${log.level || ''}</td>
                     <td>${escapeHtml(log.username || 'N/A')}</td>
                     <td>${escapeHtml(log.message || '')}</td>
                     <td>${contextHtml}</td>
@@ -359,20 +373,33 @@
         // 根据日志类型简化上下文显示
         function getSimplifiedContext(logType, contextObj) {
             if (logType === 'login') {
-                // 登录日志只显示IP
+                // 登录日志显示IP和角色信息
+                let parts = [];
                 if (contextObj.ip) {
-                    return `<span style="color: #666;">${escapeHtml(contextObj.ip)}</span>`;
-                } else if (contextObj.user_agent) {
-                    // 如果没有IP，显示浏览器信息的简化版本
-                    const ua = contextObj.user_agent;
-                    if (ua.includes('Chrome')) return '<span style="color: #666;">Chrome</span>';
-                    if (ua.includes('Firefox')) return '<span style="color: #666;">Firefox</span>';
-                    if (ua.includes('Safari')) return '<span style="color: #666;">Safari</span>';
-                    return '<span style="color: #666;">其他浏览器</span>';
+                    parts.push(`<span style="color: #666;">IP: ${escapeHtml(contextObj.ip)}</span>`);
                 }
+                if (contextObj.role) {
+                    const roleNames = {
+                        'sysadmin': '系统管理员',
+                        'admin': '管理员', 
+                        'netadmin': '网管'
+                    };
+                    const roleName = roleNames[contextObj.role] || contextObj.role;
+                    parts.push(`<span style="color: #007bff;">角色: ${roleName}</span>`);
+                }
+                if (contextObj.user_agent) {
+                    const ua = contextObj.user_agent;
+                    if (ua.includes('Chrome')) parts.push('<span style="color: #666;">Chrome</span>');
+                    else if (ua.includes('Firefox')) parts.push('<span style="color: #666;">Firefox</span>');
+                    else if (ua.includes('Safari')) parts.push('<span style="color: #666;">Safari</span>');
+                    else parts.push('<span style="color: #666;">其他浏览器</span>');
+                }
+                return parts.length > 0 ? parts.join(' | ') : '-';
             } else if (logType === 'operation') {
                 // 操作日志显示简要信息
-                if (contextObj.id) {
+                if (contextObj.account_id) {
+                    return `<span style="color: #007bff;">账户ID: ${contextObj.account_id}</span>`;
+                } else if (contextObj.id) {
                     return `<span style="color: #007bff;">ID: ${contextObj.id}</span>`;
                 } else if (contextObj.ids && Array.isArray(contextObj.ids)) {
                     return `<span style="color: #007bff;">批量操作: ${contextObj.ids.length} 项</span>`;
@@ -383,14 +410,32 @@
                     return `<span style="color: #ffc107;">修改 ${changeCount} 个字段</span>`;
                 } else if (contextObj.days) {
                     return `<span style="color: #dc3545;">清理 ${contextObj.days} 天前</span>`;
+                } else if (contextObj.segment_id) {
+                    return `<span style="color: #17a2b8;">IP段: ${contextObj.segment_id}</span>`;
                 }
             } else if (logType === 'runtime') {
-                // 运行时日志显示错误类型或状态
-                if (contextObj.error) {
-                    return `<span style="color: #dc3545;">错误</span>`;
-                } else if (contextObj.status) {
-                    return `<span style="color: #28a745;">${escapeHtml(contextObj.status)}</span>`;
+                // 运行时日志显示状态和IP信息
+                let parts = [];
+                if (contextObj.status) {
+                    const statusColors = {
+                        'started': '#007bff',
+                        'completed': '#28a745',
+                        'failed': '#dc3545',
+                        'error': '#dc3545'
+                    };
+                    const color = statusColors[contextObj.status] || '#28a745';
+                    parts.push(`<span style="color: ${color};">状态: ${escapeHtml(contextObj.status)}</span>`);
                 }
+                if (contextObj.ip) {
+                    parts.push(`<span style="color: #666;">IP: ${escapeHtml(contextObj.ip)}</span>`);
+                }
+                if (contextObj.segment_id) {
+                    parts.push(`<span style="color: #17a2b8;">段ID: ${contextObj.segment_id}</span>`);
+                }
+                if (contextObj.error) {
+                    parts.push(`<span style="color: #dc3545;">错误</span>`);
+                }
+                return parts.length > 0 ? parts.join(' | ') : '-';
             }
             
             // 默认情况：显示前30个字符，并用省略号
@@ -457,6 +502,11 @@
 
         // 页面加载时初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 检查协议安全性
+            if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                document.getElementById('securityNotice').style.display = 'block';
+            }
+            
             // 获取当前用户信息并设置权限
             checkUserPermissions();
             
