@@ -133,6 +133,40 @@
         </div>
     </div>
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         // 品牌类型定义
         const BRAND_TYPES = [
             { key: 'monitor', label: '显示器品牌' },
@@ -241,42 +275,48 @@
         }
 
         // 获取品牌数据（从后端API读取）
-        function fetchBrandList(type) {
-            if (type === 'all') {
-                // 获取所有品牌（后端API返回所有类型）
-                fetch('../api/brand')
-                    .then(res => res.json())
-                    .then(res => {
-                        if (res.code === 0 && Array.isArray(res.data)) {
-                            // 按类型分组
-                            BRAND_TYPES.forEach(t => {
-                                brandData[t.key] = res.data.filter(item => item.type === t.key);
-                            });
-                            brandData.all = res.data;
-                            renderBrandTable('all');
-                            renderBrandStats();
-                        } else {
-                            BRAND_TYPES.forEach(t => { brandData[t.key] = []; });
-                            brandData.all = [];
-                            renderBrandTable('all');
-                            renderBrandStats();
-                        }
-                    });
-            } else {
-                // 获取某一类型品牌
-                fetch(`../api/brand?type=${type}`)
-                    .then(res => res.json())
-                    .then(res => {
-                        if (res.code === 0 && Array.isArray(res.data)) {
-                            brandData[type] = res.data;
-                            renderBrandTable(type);
-                            renderBrandStats();
-                        } else {
-                            brandData[type] = [];
-                            renderBrandTable(type);
-                            renderBrandStats();
-                        }
-                    });
+        async function fetchBrandList(type) {
+            try {
+                if (type === 'all') {
+                    // 获取所有品牌（后端API返回所有类型）
+                    const res = await apiRequest('../api/brand');
+                    if (res && res.code === 0 && Array.isArray(res.data)) {
+                        // 按类型分组
+                        BRAND_TYPES.forEach(t => {
+                            brandData[t.key] = res.data.filter(item => item.type === t.key);
+                        });
+                        brandData.all = res.data;
+                        renderBrandTable('all');
+                        renderBrandStats();
+                    } else {
+                        BRAND_TYPES.forEach(t => { brandData[t.key] = []; });
+                        brandData.all = [];
+                        renderBrandTable('all');
+                        renderBrandStats();
+                    }
+                } else {
+                    // 获取某一类型品牌
+                    const res = await apiRequest(`../api/brand?type=${type}`);
+                    if (res && res.code === 0 && Array.isArray(res.data)) {
+                        brandData[type] = res.data;
+                        renderBrandTable(type);
+                        renderBrandStats();
+                    } else {
+                        brandData[type] = [];
+                        renderBrandTable(type);
+                        renderBrandStats();
+                    }
+                }
+            } catch (error) {
+                console.error('获取品牌列表失败:', error);
+                if (type === 'all') {
+                    BRAND_TYPES.forEach(t => { brandData[t.key] = []; });
+                    brandData.all = [];
+                } else {
+                    brandData[type] = [];
+                }
+                renderBrandTable(type);
+                renderBrandStats();
             }
         }
 
@@ -333,7 +373,7 @@
         }
 
         // 新增/编辑提交（抽屉表单）
-        document.getElementById('brandDrawerForm').onsubmit = function(e) {
+        document.getElementById('brandDrawerForm').onsubmit = async function(e) {
             e.preventDefault();
             const type = this.type.value;
             const id = this.id.value;
@@ -343,39 +383,33 @@
                 alert('品牌名称和所属类型不能为空');
                 return;
             }
-            // 新增/编辑时写入数据库
-            if (id) {
-                // 编辑
-                fetch(`../api/brand/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, type: brandType })
-                }).then(res => res.json()).then(res => {
-                    if (res.code === 0) {
-                        fetchBrandList(brandType);
-                        fetchBrandList('all');
-                        renderBrandStats();
-                        hideBrandDrawer();
-                    } else {
-                        alert('编辑失败');
-                    }
-                });
-            } else {
-                // 新增
-                fetch('../api/brand', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, type: brandType })
-                }).then(res => res.json()).then(res => {
-                    if (res.code === 0) {
-                        fetchBrandList(brandType);
-                        fetchBrandList('all');
-                        renderBrandStats();
-                        hideBrandDrawer();
-                    } else {
-                        alert('新增失败');
-                    }
-                });
+            try {
+                let res;
+                // 新增/编辑时写入数据库
+                if (id) {
+                    // 编辑
+                    res = await apiRequest(`../api/brand/${id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ name, type: brandType })
+                    });
+                } else {
+                    // 新增
+                    res = await apiRequest('../api/brand', {
+                        method: 'POST',
+                        body: JSON.stringify({ name, type: brandType })
+                    });
+                }
+                if (res && res.code === 0) {
+                    fetchBrandList(brandType);
+                    fetchBrandList('all');
+                    renderBrandStats();
+                    hideBrandDrawer();
+                } else {
+                    alert(id ? '编辑失败' : '新增失败');
+                }
+            } catch (error) {
+                console.error('品牌操作失败:', error);
+                alert(id ? '编辑失败' : '新增失败');
             }
         };
 
@@ -392,7 +426,7 @@
         document.getElementById('deleteModal').addEventListener('mousedown', function(e) {
             if (e.target === this) this.classList.remove('show');
         });
-        document.getElementById('deleteModalOkBtn').onclick = function() {
+        document.getElementById('deleteModalOkBtn').onclick = async function() {
             let type = currentDeleteType;
             let id = currentDeleteId;
             // 删除时需确定所属类型
@@ -407,11 +441,10 @@
                     }
                 }
             }
-            // 删除数据库数据
-            fetch(`../api/brand/${id}`, {
-                method: 'DELETE'
-            }).then(res => res.json()).then(res => {
-                if (res.code === 0) {
+            try {
+                // 删除数据库数据
+                const res = await apiRequest(`../api/brand/${id}`, { method: 'DELETE' });
+                if (res && res.code === 0) {
                     fetchBrandList(foundType);
                     fetchBrandList('all');
                     renderBrandStats();
@@ -419,11 +452,14 @@
                 } else {
                     alert('删除失败');
                 }
-            });
+            } catch (error) {
+                console.error('删除品牌失败:', error);
+                alert('删除失败');
+            }
         };
 
         // 批量删除按钮逻辑
-        document.getElementById('batchDeleteBrandBtn').onclick = function() {
+        document.getElementById('batchDeleteBrandBtn').onclick = async function() {
             const checkedBoxes = Array.from(document.querySelectorAll('.rowBrandCheckbox')).filter(cb => cb.checked);
             if (checkedBoxes.length === 0) {
                 alert('请先选择要删除的品牌');
@@ -432,18 +468,21 @@
             if (!confirm(`确定要删除选中的${checkedBoxes.length}项吗？`)) return;
             // 收集所有选中的id
             const ids = checkedBoxes.map(cb => cb.getAttribute('data-id'));
-            fetch('../api/brand/batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids })
-            }).then(res => res.json()).then(res => {
-                if (res.code === 0) {
+            try {
+                const res = await apiRequest('../api/brand/batch', {
+                    method: 'POST',
+                    body: JSON.stringify({ ids })
+                });
+                if (res && res.code === 0) {
                     fetchBrandList('all');
                     renderBrandStats();
                 } else {
                     alert('批量删除失败');
                 }
-            });
+            } catch (error) {
+                console.error('批量删除失败:', error);
+                alert('批量删除失败');
+            }
         };
 
         // 页面初始化

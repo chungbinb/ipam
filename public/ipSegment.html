@@ -697,21 +697,54 @@
         </div>
     </div>
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         // 页面加载时从后端获取数据
         let ipRangeList = [];
         let ipAddrList = [];
 
-        function fetchIpAddrsForStats() {
-            return fetch('../api/ip-addresses')
-                .then(res => res.json())
-                .then(data => {
-                    ipAddrList = Array.isArray(data) ? data : [];
-                    // 查找手动标记的IP
-                    const manualIps = ipAddrList.filter(ip => ip.manual !== null && ip.manual !== undefined && ip.manual !== '');
-                })
-                .catch(() => {
-                    ipAddrList = [];
-                });
+        async function fetchIpAddrsForStats() {
+            try {
+                const data = await apiRequest('../api/ip-addresses');
+                ipAddrList = Array.isArray(data) ? data : [];
+                // 查找手动标记的IP
+                const manualIps = ipAddrList.filter(ip => ip.manual !== null && ip.manual !== undefined && ip.manual !== '');
+            } catch (error) {
+                console.error('获取IP地址列表失败:', error);
+                ipAddrList = [];
+            }
         }
 
         function renderIpRangeStats() {
@@ -735,24 +768,23 @@
             document.getElementById('ipAvailableCount').innerText = available;
         }
 
-        function fetchIpRanges() {
-            fetch('../api/ip-segments')
-                .then(res => res.json())
-                .then(data => {
-                    ipRangeList = Array.isArray(data) ? data : [];
-                    // 先获取IP地址数据再渲染统计卡片
-                    fetchIpAddrsForStats().then(() => {
-                        renderIpRangeStats();
-                        renderIpRangeTable(ipRangeList);
-                    });
-                })
-                .catch(() => {
-                    ipRangeList = [];
-                    ipAddrList = [];
-                    renderIpRangeStats();
-                    renderIpRangeTable(ipRangeList);
-                });
+        async function fetchIpRanges() {
+            try {
+                const data = await apiRequest('../api/ip-segments');
+                ipRangeList = Array.isArray(data) ? data : [];
+                // 先获取IP地址数据再渲染统计卡片
+                await fetchIpAddrsForStats();
+                renderIpRangeStats();
+                renderIpRangeTable(ipRangeList);
+            } catch (error) {
+                console.error('获取IP段列表失败:', error);
+                ipRangeList = [];
+                ipAddrList = [];
+                renderIpRangeStats();
+                renderIpRangeTable(ipRangeList);
+            }
         }
+        
 
         // 删除弹窗相关变量
         let pendingDeleteId = null;
@@ -782,24 +814,23 @@
         document.getElementById('deleteModal').addEventListener('mousedown', function(e) {
             if (e.target === this) hideDeleteModal();
         });
-        document.getElementById('confirmDeleteBtn').onclick = function() {
+        document.getElementById('confirmDeleteBtn').onclick = async function() {
             if (!pendingDeleteId) return;
-            fetch('../api/ip-segments/' + pendingDeleteId, { method: 'DELETE' })
-                .then(res => res.json())
-                .then(result => {
-                    hideDeleteModal();
-                    pendingDeleteId = null;
-                    if (result.success) {
-                        fetchIpRanges();
-                    } else {
-                        alert(result.message || '删除失败');
-                    }
-                })
-                .catch(() => {
-                    hideDeleteModal();
-                    pendingDeleteId = null;
-                    alert('网络错误，删除失败');
-                });
+            try {
+                const result = await apiRequest('../api/ip-segments/' + pendingDeleteId, { method: 'DELETE' });
+                hideDeleteModal();
+                pendingDeleteId = null;
+                if (result && result.success) {
+                    fetchIpRanges();
+                } else {
+                    alert(result.message || '删除失败');
+                }
+            } catch (error) {
+                console.error('删除IP段失败:', error);
+                hideDeleteModal();
+                pendingDeleteId = null;
+                alert('网络错误，删除失败');
+            }
         };
 
         // 替换原气泡弹窗为居中弹窗

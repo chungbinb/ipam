@@ -160,6 +160,40 @@
         </div>
     </div>
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         // 部门数据缓存
         let departmentList = [];
         let currentEditId = null;
@@ -232,27 +266,22 @@
         }
 
         // 获取部门数据（后端API）
-        function fetchDepartmentList() {
-            fetch('../api/department')
-                .then(res => res.text())
-                .then(txt => {
-                    let res;
-                    try {
-                        res = JSON.parse(txt);
-                    } catch (e) {
-                        // 如果不是JSON，返回空数组
-                        res = { code: 1, data: [] };
-                    }
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        departmentList = res.data;
-                        renderDepartmentTable();
-                        renderDepartmentStats();
-                    } else {
-                        departmentList = [];
-                        renderDepartmentTable();
-                        renderDepartmentStats();
-                    }
-                });
+        async function fetchDepartmentList() {
+            try {
+                const res = await apiRequest('../api/department');
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    departmentList = res.data;
+                } else {
+                    departmentList = [];
+                }
+                renderDepartmentTable();
+                renderDepartmentStats();
+            } catch (error) {
+                console.error('获取部门列表失败:', error);
+                departmentList = [];
+                renderDepartmentTable();
+                renderDepartmentStats();
+            }
         }
 
         // 新增/编辑弹窗逻辑
@@ -274,7 +303,7 @@
         });
 
         // 新增/编辑提交
-        document.getElementById('departmentForm').onsubmit = function(e) {
+        document.getElementById('departmentForm').onsubmit = async function(e) {
             e.preventDefault();
             const id = this.id.value;
             const name = this.name.value.trim();
@@ -285,34 +314,30 @@
                 return;
             }
             const payload = { name, region, remark };
-            if (id) {
-                // 编辑
-                fetch(`../api/department/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).then(res => res.json()).then(res => {
-                    if (res.code === 0) {
-                        fetchDepartmentList();
-                        document.getElementById('departmentModal').classList.remove('show');
-                    } else {
-                        alert('编辑失败');
-                    }
-                });
-            } else {
-                // 新增
-                fetch('../api/department', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).then(res => res.json()).then(res => {
-                    if (res.code === 0) {
-                        fetchDepartmentList();
-                        document.getElementById('departmentModal').classList.remove('show');
-                    } else {
-                        alert('新增失败');
-                    }
-                });
+            try {
+                let res;
+                if (id) {
+                    // 编辑
+                    res = await apiRequest(`../api/department/${id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    // 新增
+                    res = await apiRequest('../api/department', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                }
+                if (res && res.code === 0) {
+                    fetchDepartmentList();
+                    document.getElementById('departmentModal').classList.remove('show');
+                } else {
+                    alert(id ? '编辑失败' : '新增失败');
+                }
+            } catch (error) {
+                console.error('部门操作失败:', error);
+                alert(id ? '编辑失败' : '新增失败');
             }
         };
 
@@ -328,22 +353,24 @@
         document.getElementById('deleteDepartmentModal').addEventListener('mousedown', function(e) {
             if (e.target === this) this.classList.remove('show');
         });
-        document.getElementById('deleteDepartmentModalOkBtn').onclick = function() {
+        document.getElementById('deleteDepartmentModalOkBtn').onclick = async function() {
             const id = currentDeleteId;
-            fetch(`../api/department/${id}`, { method: 'DELETE' })
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0) {
-                        fetchDepartmentList();
-                        document.getElementById('deleteDepartmentModal').classList.remove('show');
-                    } else {
-                        alert('删除失败');
-                    }
-                });
+            try {
+                const res = await apiRequest(`../api/department/${id}`, { method: 'DELETE' });
+                if (res && res.code === 0) {
+                    fetchDepartmentList();
+                    document.getElementById('deleteDepartmentModal').classList.remove('show');
+                } else {
+                    alert('删除失败');
+                }
+            } catch (error) {
+                console.error('删除部门失败:', error);
+                alert('删除失败');
+            }
         };
 
         // 批量删除
-        document.getElementById('batchDeleteDepartmentBtn').onclick = function() {
+        document.getElementById('batchDeleteDepartmentBtn').onclick = async function() {
             const checkedBoxes = Array.from(document.querySelectorAll('.rowDepartmentCheckbox')).filter(cb => cb.checked);
             if (checkedBoxes.length === 0) {
                 alert('请先选择要删除的部门');
@@ -351,17 +378,20 @@
             }
             if (!confirm(`确定要删除选中的${checkedBoxes.length}项吗？`)) return;
             const ids = checkedBoxes.map(cb => cb.getAttribute('data-id'));
-            fetch('../api/department/batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids })
-            }).then(res => res.json()).then(res => {
-                if (res.code === 0) {
+            try {
+                const res = await apiRequest('../api/department/batch', {
+                    method: 'POST',
+                    body: JSON.stringify({ ids })
+                });
+                if (res && res.code === 0) {
                     fetchDepartmentList();
                 } else {
                     alert('批量删除失败');
                 }
-            });
+            } catch (error) {
+                console.error('批量删除失败:', error);
+                alert('批量删除失败');
+            }
         };
 
         // 新增/编辑抽屉弹窗逻辑
@@ -401,7 +431,7 @@
         }
 
         // 新增/编辑提交（抽屉表单）
-        document.getElementById('departmentDrawerForm').onsubmit = function(e) {
+        document.getElementById('departmentDrawerForm').onsubmit = async function(e) {
             e.preventDefault();
             const id = this.id.value;
             const name = this.name.value.trim();
@@ -412,34 +442,30 @@
                 return;
             }
             const payload = { name, region, remark };
-            if (id) {
-                // 编辑
-                fetch(`../api/department/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).then(res => res.json()).then(res => {
-                    if (res.code === 0) {
-                        fetchDepartmentList();
-                        hideDepartmentDrawer();
-                    } else {
-                        alert('编辑失败');
-                    }
-                });
-            } else {
-                // 新增
-                fetch('../api/department', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).then(res => res.json()).then(res => {
-                    if (res.code === 0) {
-                        fetchDepartmentList();
-                        hideDepartmentDrawer();
-                    } else {
-                        alert('新增失败');
-                    }
-                });
+            try {
+                let res;
+                if (id) {
+                    // 编辑
+                    res = await apiRequest(`../api/department/${id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    // 新增
+                    res = await apiRequest('../api/department', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                }
+                if (res && res.code === 0) {
+                    fetchDepartmentList();
+                    hideDepartmentDrawer();
+                } else {
+                    alert(id ? '编辑失败' : '新增失败');
+                }
+            } catch (error) {
+                console.error('部门操作失败:', error);
+                alert(id ? '编辑失败' : '新增失败');
             }
         };
 

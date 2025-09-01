@@ -325,6 +325,40 @@
     </div>
 
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             var currentUser = null;
             var editingId = null; // null=新增，否则编辑id
@@ -335,25 +369,27 @@
                 return '网管';
             }
             
-            function fetchMe() { 
-                return fetch('../api/account/me')
-                    .then(function(r){ return r.json(); })
-                    .then(function(res){ 
-                        if (res && res.code === 0) { 
-                            currentUser = res.data;
-                        } else {
-                            console.error('获取当前用户失败:', res);
-                        }
-                    })
-                    .catch(function(err) {
-                        console.error('获取当前用户异常:', err);
-                    });
+            async function fetchMe() { 
+                try {
+                    const res = await apiRequest('../api/account/me');
+                    if (res && res.code === 0) { 
+                        currentUser = res.data;
+                    } else {
+                        console.error('获取当前用户失败:', res);
+                    }
+                } catch (err) {
+                    console.error('获取当前用户异常:', err);
+                }
             }
             
-            function fetchList() { 
-                return fetch('../api/accounts')
-                    .then(function(r){ return r.json(); })
-                    .then(function(res){ return (res && res.code===0) ? res.data : []; }); 
+            async function fetchList() { 
+                try {
+                    const res = await apiRequest('../api/accounts');
+                    return (res && res.code === 0) ? res.data : [];
+                } catch (err) {
+                    console.error('获取账号列表失败:', err);
+                    return [];
+                }
             }
             
             function canAdd() { 
@@ -643,7 +679,7 @@
                 }, 300);
             }
             
-            function doDelete(row) {
+            async function doDelete(row) {
                 if (!canDeleteRow(row)) {
                     var reason = '';
                     if (currentUser.role === 'netadmin') {
@@ -660,23 +696,21 @@
                 }
                 
                 if (!confirm('确定删除账号 "'+ row.username +'"？')) return;
-                fetch('../api/accounts/'+ row.id, { method: 'DELETE' })
-                 .then(function(r){ return r.json(); })
-                 .then(function(res){ 
-                     if (res && res.code===0) { 
-                         alert('删除成功！');
-                         load(); 
-                     } else { 
-                         alert(res.msg || '删除失败'); 
-                     } 
-                 })
-                 .catch(function(err) {
-                     console.error('删除请求失败:', err);
-                     alert('删除请求失败');
-                 });
+                try {
+                    const res = await apiRequest('../api/accounts/' + row.id, { method: 'DELETE' });
+                    if (res && res.code === 0) { 
+                        alert('删除成功！');
+                        await load(); 
+                    } else { 
+                        alert(res.msg || '删除失败'); 
+                    }
+                } catch (err) {
+                    console.error('删除请求失败:', err);
+                    alert('删除请求失败');
+                }
             }
             
-            function save() {
+            async function save() {
                 var u = ($('#fUsername').val()||'').trim(); 
                 var p = ($('#fPassword').val()||'').trim();
                 var r = $('#fRole').val(); 
@@ -694,26 +728,23 @@
                         return; 
                     }
                     
-                    fetch('../api/accounts', { 
-                        method: 'POST', 
-                        headers:{'Content-Type':'application/json'}, 
-                        body: JSON.stringify({ username:u, password:p, role:r, status:s }) 
-                    })
-                    .then(function(r){ return r.json(); })
-                    .then(function(res){ 
-                        if (res && res.code===0) { 
+                    try {
+                        const res = await apiRequest('../api/accounts', { 
+                            method: 'POST', 
+                            body: JSON.stringify({ username:u, password:p, role:r, status:s }) 
+                        });
+                        if (res && res.code === 0) { 
                             // 成功提示
                             alert('新增账号成功！');
                             closeModal(); 
-                            load(); 
+                            await load(); 
                         } else { 
                             $('#modalTip').text(res.msg||'保存失败'); 
-                        } 
-                    })
-                    .catch(function(err) {
+                        }
+                    } catch (err) {
                         console.error('新增请求失败:', err);
                         $('#modalTip').text('新增请求失败');
-                    });
+                    }
                 } else {
                     // 编辑模式
                     var payload = {}; 
@@ -729,26 +760,23 @@
                         payload.status = s;
                     }
                     
-                    fetch('../api/accounts/'+ editingId, { 
-                        method: 'PUT', 
-                        headers:{'Content-Type':'application/json'}, 
-                        body: JSON.stringify(payload) 
-                    })
-                    .then(function(r){ return r.json(); })
-                    .then(function(res){ 
-                        if (res && res.code===0) { 
+                    try {
+                        const res = await apiRequest('../api/accounts/' + editingId, { 
+                            method: 'PUT', 
+                            body: JSON.stringify(payload) 
+                        });
+                        if (res && res.code === 0) { 
                             // 成功提示
                             alert('修改成功！');
                             closeModal(); 
-                            load(); 
+                            await load(); 
                         } else { 
                             $('#modalTip').text(res.msg||'保存失败'); 
-                        } 
-                    })
-                    .catch(function(err) {
+                        }
+                    } catch (err) {
                         console.error('编辑请求失败:', err);
                         $('#modalTip').text('编辑请求失败');
-                    });
+                    }
                 }
             }
             
@@ -758,17 +786,17 @@
                 }); 
             }
             
-            function load(){ 
-                fetchMe().then(function(){ 
+            async function load(){ 
+                try {
+                    await fetchMe();
                     renderRoleTip(); 
                     updateStatsLabels(); // 初始化统计标签
-                    return fetchList(); 
-                }).then(function(rows){ 
+                    const rows = await fetchList();
                     renderTable(rows); 
-                }).catch(function(err) {
+                } catch (err) {
                     console.error('加载数据失败:', err);
                     alert('加载数据失败，请刷新页面重试');
-                }); 
+                }
             }
             
             $('#btnAdd').on('click', function(){ 

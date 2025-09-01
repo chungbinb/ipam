@@ -376,6 +376,40 @@
         </div>
     </div>
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         // 数据变量
         let hostList = [];
         let filteredList = [];
@@ -600,33 +634,38 @@
         };
 
         // 新增/编辑/删除/批量删除操作（需后端API支持）
-        function fetchHostList() {
-            fetch('../api/host')
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        hostList = res.data;
-                        filteredList = hostList;
-                        renderHostTablePage();
-                    } else {
-                        hostList = [];
-                        filteredList = [];
-                        renderHostTablePage();
-                    }
-                });
+        async function fetchHostList() {
+            try {
+                const res = await apiRequest('../api/host');
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    hostList = res.data;
+                    filteredList = hostList;
+                    renderHostTablePage();
+                } else {
+                    hostList = [];
+                    filteredList = [];
+                    renderHostTablePage();
+                }
+            } catch (error) {
+                console.error('获取主机列表失败:', error);
+                hostList = [];
+                filteredList = [];
+                renderHostTablePage();
+            }
         }
 
-        function addHost(data, cb) {
-            fetch('../api/host', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) fetchHostList();
+        async function addHost(data, cb) {
+            try {
+                const res = await apiRequest('../api/host', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                if (res && res.code === 0) fetchHostList();
                 if (cb) cb(res);
-            });
+            } catch (error) {
+                console.error('新增主机失败:', error);
+                if (cb) cb({ code: 1, msg: '网络错误' });
+            }
         }
         // 编辑按钮逻辑
         window.editHost = function(id) {
@@ -638,7 +677,7 @@
         };
 
         // 保存按钮逻辑
-        window.saveHostEdit = function(id) {
+        window.saveHostEdit = async function(id) {
             let found = filteredList.find(item => item.id == id);
             if (!found) return;
             // 获取编辑行的所有input
@@ -650,32 +689,24 @@
             });
             // 不传 updated_at，由后端自动更新时间
             delete found._editing;
-            fetch('../api/host/' + id, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(res => {
-                // 首先检查响应是否为JSON
-                const contentType = res.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('服务器返回非JSON响应，可能是PHP错误');
-                }
-                return res.json();
-            })
-            .then(res => {
-                if (res.code === 0) {
+            
+            try {
+                const res = await apiRequest('../api/host/' + id, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                
+                if (res && res.code === 0) {
                     fetchHostList();
                 } else {
-                    alert(res.msg || '保存失败'); // 新增：展示后端错误
+                    alert(res?.msg || '保存失败');
                     renderHostTablePage();
                 }
-            })
-            .catch(err => {
-                console.error('保存主机编辑失败:', err);
-                alert('保存失败: ' + err.message);
+            } catch (error) {
+                console.error('保存主机编辑失败:', error);
+                alert('保存失败: ' + error.message);
                 renderHostTablePage();
-            });
+            }
         };
 
         // 取消按钮逻辑
@@ -685,25 +716,28 @@
             renderHostTablePage();
         };
 
-        function deleteHost(id) {
+        async function deleteHost(id) {
             if (!confirm('确定要删除该主机吗？')) return;
-            fetch('../api/host/' + id, { method: 'DELETE' })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) fetchHostList();
-            });
+            try {
+                const res = await apiRequest('../api/host/' + id, { method: 'DELETE' });
+                if (res && res.code === 0) fetchHostList();
+            } catch (error) {
+                console.error('删除主机失败:', error);
+            }
         }
-        function batchDeleteHost(ids, cb) {
-            fetch('../api/host/batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids })
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) fetchHostList();
+        
+        async function batchDeleteHost(ids, cb) {
+            try {
+                const res = await apiRequest('../api/host/batch', {
+                    method: 'POST',
+                    body: JSON.stringify({ ids })
+                });
+                if (res && res.code === 0) fetchHostList();
                 if (cb) cb(res);
-            });
+            } catch (error) {
+                console.error('批量删除主机失败:', error);
+                if (cb) cb({ code: 1, msg: '网络错误' });
+            }
         }
 
         // 批量删除按钮逻辑
@@ -806,47 +840,46 @@
                 let failCount = 0;
                 let total = importData.length;
                 let finished = 0;
-                importData.forEach(item => {
-                    fetch('../api/host', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(item)
-                    })
-                    .then(res => res.json())
-                    .then(res => {
+                importData.forEach(async item => {
+                    try {
+                        const res = await apiRequest('../api/host', {
+                            method: 'POST',
+                            body: JSON.stringify(item)
+                        });
                         finished++;
-                        if (res.code === 0) successCount++;
+                        if (res && res.code === 0) successCount++;
                         else failCount++;
                         if (finished === total) {
                             alert(`导入完成：成功${successCount}条，失败${failCount}条`);
                             fetchHostList();
                         }
-                    })
-                    .catch(() => {
+                    } catch (error) {
                         finished++;
                         failCount++;
                         if (finished === total) {
                             alert(`导入完成：成功${successCount}条，失败${failCount}条`);
                             fetchHostList();
                         }
-                    });
+                    }
                 });
             };
             reader.readAsArrayBuffer(file);
         }
 
         // 导出按钮逻辑
-        document.getElementById('exportHostBtn').onclick = function() {
+        document.getElementById('exportHostBtn').onclick = async function() {
             // 导出所有主机数据为xlsx
-            fetch('../api/host')
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0 && Array.isArray(res.data) && res.data.length) {
-                        exportHostTableXlsx(res.data);
-                    } else {
-                        alert('没有可导出的数据');
-                    }
-                });
+            try {
+                const res = await apiRequest('../api/host');
+                if (res && res.code === 0 && Array.isArray(res.data) && res.data.length) {
+                    exportHostTableXlsx(res.data);
+                } else {
+                    alert('没有可导出的数据');
+                }
+            } catch (error) {
+                console.error('导出数据失败:', error);
+                alert('导出失败: ' + error.message);
+            }
         };
 
         // 使用 SheetJS 导出为xlsx
@@ -937,21 +970,22 @@
         // 新增主机抽屉逻辑
         const addHostDrawer = document.getElementById('addHostDrawer');
         const addHostDrawerMask = document.getElementById('addHostDrawerMask');
-        document.getElementById('addHostBtn').onclick = function() {
+        document.getElementById('addHostBtn').onclick = async function() {
             addHostDrawer.style.right = '0';
             addHostDrawerMask.style.display = 'block';
             // 拉取部门列表
-            fetch('../api/department')
-                .then(res => res.json())
-                .then(res => {
-                    const select = document.getElementById('addHostDepartmentSelect');
-                    select.innerHTML = '<option value="">请选择部门</option>';
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        res.data.forEach(dep => {
-                            select.innerHTML += `<option value="${dep.name}">${dep.name}</option>`;
-                        });
-                    }
-                });
+            try {
+                const res = await apiRequest('../api/department');
+                const select = document.getElementById('addHostDepartmentSelect');
+                select.innerHTML = '<option value="">请选择部门</option>';
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    res.data.forEach(dep => {
+                        select.innerHTML += `<option value="${dep.name}">${dep.name}</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('获取部门列表失败:', error);
+            }
         };
         document.getElementById('closeAddHostDrawerBtn').onclick = function() {
             addHostDrawer.style.right = '-520px';

@@ -331,6 +331,40 @@
         </div>
     </div>
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         // 数据变量
         let consumableList = [];
         let filteredList = [];
@@ -338,22 +372,27 @@
         let pageSize = 10;
 
         // 从后端获取耗材数据
-        function fetchConsumableList() {
-            fetch('../api/consumable')
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        consumableList = res.data;
-                        filteredList = consumableList;
-                        renderStats();
-                        renderTablePage();
-                    } else {
-                        consumableList = [];
-                        filteredList = [];
-                        renderStats();
-                        renderTablePage();
-                    }
-                });
+        async function fetchConsumableList() {
+            try {
+                const res = await apiRequest('../api/consumable');
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    consumableList = res.data;
+                    filteredList = consumableList;
+                    renderStats();
+                    renderTablePage();
+                } else {
+                    consumableList = [];
+                    filteredList = [];
+                    renderStats();
+                    renderTablePage();
+                }
+            } catch (error) {
+                console.error('获取耗材列表失败:', error);
+                consumableList = [];
+                filteredList = [];
+                renderStats();
+                renderTablePage();
+            }
         }
 
         function renderStats() {
@@ -565,7 +604,7 @@
             document.getElementById('cancelEditConsumableBtn').onclick = () => modal.remove();
             modal.onclick = (e)=>{ if (e.target === modal) modal.remove(); };
 
-            document.getElementById('editConsumableForm').onsubmit = function(e) {
+            document.getElementById('editConsumableForm').onsubmit = async function(e) {
                 e.preventDefault();
                 const fd = new FormData(this);
                 let payload = {};
@@ -573,21 +612,21 @@
                 // 明确不提交 stock 字段（后端也会忽略）
                 if ('stock' in payload) delete payload.stock;
 
-                fetch(`../api/consumable/${item.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.code === 0) {
+                try {
+                    const res = await apiRequest(`../api/consumable/${item.id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+                    if (res && res.code === 0) {
                         modal.remove();
                         fetchConsumableList();
                     } else {
                         alert(res.msg || '保存失败');
                     }
-                })
-                .catch(()=>alert('网络错误，保存失败'));
+                } catch (error) {
+                    console.error('修改耗材失败:', error);
+                    alert('网络错误，保存失败');
+                }
             };
         }
 
@@ -623,27 +662,27 @@
             document.body.appendChild(modal);
             document.getElementById('cancelInStockBtn').onclick = () => modal.remove();
             modal.onclick = (e)=>{ if (e.target === modal) modal.remove(); };
-            document.getElementById('inStockForm').onsubmit = function(e) {
+            document.getElementById('inStockForm').onsubmit = async function(e) {
                 e.preventDefault();
                 const fd = new FormData(this);
                 const count = parseInt(fd.get('in_count'), 10);
                 if (!count || count < 1) return alert('入库数量必须大于0');
                 const remark = (fd.get('remark') || '').trim();
-                fetch(`../api/consumable/${item.id}/in`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ in_count: count, remark })
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.code === 0) {
+                try {
+                    const res = await apiRequest(`../api/consumable/${item.id}/in`, {
+                        method: 'POST',
+                        body: JSON.stringify({ in_count: count, remark })
+                    });
+                    if (res && res.code === 0) {
                         modal.remove();
                         fetchConsumableList();
                     } else {
                         alert(res.msg || '入库失败');
                     }
-                })
-                .catch(()=>alert('网络错误，入库失败'));
+                } catch (error) {
+                    console.error('入库失败:', error);
+                    alert('网络错误，入库失败');
+                }
             };
         }
         window.inStock = function(idx) { showInStockModal(idx); };
@@ -681,46 +720,48 @@
             document.body.appendChild(modal);
             document.getElementById('cancelOutStockBtn').onclick = () => modal.remove();
             modal.onclick = (e)=>{ if (e.target === modal) modal.remove(); };
-            document.getElementById('outStockForm').onsubmit = function(e) {
+            document.getElementById('outStockForm').onsubmit = async function(e) {
                 e.preventDefault();
                 const fd = new FormData(this);
                 const count = parseInt(fd.get('out_count'), 10);
                 if (!count || count < 1) return alert('出库数量必须大于0');
                 if (count > (parseInt(item.stock, 10) || 0)) return alert('库存不足');
                 const remark = (fd.get('remark') || '').trim();
-                fetch(`../api/consumable/${item.id}/out`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ out_count: count, remark })
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.code === 0) {
+                try {
+                    const res = await apiRequest(`../api/consumable/${item.id}/out`, {
+                        method: 'POST',
+                        body: JSON.stringify({ out_count: count, remark })
+                    });
+                    if (res && res.code === 0) {
                         modal.remove();
                         fetchConsumableList();
                     } else {
                         alert(res.msg || '出库失败');
                     }
-                })
-                .catch(()=>alert('网络错误，出库失败'));
+                } catch (error) {
+                    console.error('出库失败:', error);
+                    alert('网络错误，出库失败');
+                }
             };
-        }
+            };
+
         window.outStock = function(idx) { showOutStockModal(idx); };
 
         // 后端删除（单条）
-        window.deleteConsumableById = function(id) {
+        window.deleteConsumableById = async function(id) {
             if (!id) { alert('缺少ID，无法删除'); return; }
             if (!confirm('确定要删除该耗材吗？')) return;
-            fetch(`../api/consumable/${id}`, { method: 'DELETE' })
-                .then(res => res.ok ? res.json() : Promise.reject())
-                .then(res => {
-                    if (res && res.code === 0) {
-                        fetchConsumableList();
-                    } else {
-                        alert((res && res.msg) || '删除失败');
-                    }
-                })
-                .catch(() => alert('网络错误，删除失败'));
+            try {
+                const res = await apiRequest(`../api/consumable/${id}`, { method: 'DELETE' });
+                if (res && res.code === 0) {
+                    fetchConsumableList();
+                } else {
+                    alert((res && res.msg) || '删除失败');
+                }
+            } catch (error) {
+                console.error('删除耗材失败:', error);
+                alert('网络错误，删除失败');
+            }
         };
 
         // 批量删除改为调用后端逐条删除（保留）

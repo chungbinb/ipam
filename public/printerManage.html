@@ -378,6 +378,40 @@
         </div>
     </div>
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         // 打印机数据缓存
         let printerList = [];
         let currentEditId = null;
@@ -470,20 +504,22 @@
         }
 
         // 获取打印机数据（后端API）
-        function fetchPrinterList() {
-            fetch('../api/printer')
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        printerList = res.data;
-                        renderPrinterTable();
-                        renderPrinterStats();
-                    } else {
-                        printerList = [];
-                        renderPrinterTable();
-                        renderPrinterStats();
-                    }
-                });
+        async function fetchPrinterList() {
+            try {
+                const res = await apiRequest('../api/printer');
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    printerList = res.data;
+                } else {
+                    printerList = [];
+                }
+                renderPrinterTable();
+                renderPrinterStats();
+            } catch (error) {
+                console.error('获取打印机列表失败:', error);
+                printerList = [];
+                renderPrinterTable();
+                renderPrinterStats();
+            }
         }
 
         // 查询表单
@@ -504,33 +540,35 @@
         };
 
         // 拉取部门和品牌列表
-        function fetchPrinterDepartments(selectedValue) {
-            fetch('../api/department')
-                .then(res => res.json())
-                .then(res => {
-                    const select = document.getElementById('printerDepartmentSelect');
-                    select.innerHTML = '<option value="">请选择部门</option>';
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        res.data.forEach(dep => {
-                            select.innerHTML += `<option value="${dep.name}">${dep.name}</option>`;
-                        });
-                    }
-                    if (selectedValue) select.value = selectedValue;
-                });
+        async function fetchPrinterDepartments(selectedValue) {
+            try {
+                const res = await apiRequest('../api/department');
+                const select = document.getElementById('printerDepartmentSelect');
+                select.innerHTML = '<option value="">请选择部门</option>';
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    res.data.forEach(dep => {
+                        select.innerHTML += `<option value="${dep.name}">${dep.name}</option>`;
+                    });
+                }
+                if (selectedValue) select.value = selectedValue;
+            } catch (error) {
+                console.error('获取部门列表失败:', error);
+            }
         }
-        function fetchPrinterBrands(selectedValue) {
-            fetch('../api/brand?type=consumable')
-                .then(res => res.json())
-                .then(res => {
-                    const select = document.getElementById('printerBrandSelect');
-                    select.innerHTML = '<option value="">请选择品牌</option>';
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        res.data.forEach(brand => {
-                            select.innerHTML += `<option value="${brand.name}">${brand.name}</option>`;
-                        });
-                    }
-                    if (selectedValue) select.value = selectedValue;
-                });
+        async function fetchPrinterBrands(selectedValue) {
+            try {
+                const res = await apiRequest('../api/brand?type=consumable');
+                const select = document.getElementById('printerBrandSelect');
+                select.innerHTML = '<option value="">请选择品牌</option>';
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    res.data.forEach(brand => {
+                        select.innerHTML += `<option value="${brand.name}">${brand.name}</option>`;
+                    });
+                }
+                if (selectedValue) select.value = selectedValue;
+            } catch (error) {
+                console.error('获取品牌列表失败:', error);
+            }
         }
         // 新增/编辑抽屉弹窗逻辑
         window.showPrinterModal = function(id, department, user, brand, model, color, type, func, asset_number, status, price, currency) {
@@ -583,7 +621,7 @@
         }
 
         // 新增/编辑提交（抽屉表单）
-        document.getElementById('printerDrawerForm').onsubmit = function(e) {
+        document.getElementById('printerDrawerForm').onsubmit = async function(e) {
             e.preventDefault();
             const id = this.id.value;
             const department = this.department.value;
@@ -633,36 +671,42 @@
             const payload = { department, user, brand, model, color, type, function: func, asset_number, status, price, currency };
             if (id) {
                 // 编辑
-                fetch(`../api/printer/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).then(res => res.json()).then(res => {
-                    if (res.code === 0) {
+                try {
+                    const res = await apiRequest(`../api/printer/${id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload)
+                    });
+                    if (res && res.code === 0) {
                         fetchPrinterList();
                         hidePrinterDrawer();
-                    } else if (res.msg && res.msg.indexOf('资产编号已存在') !== -1) {
+                    } else if (res && res.msg && res.msg.indexOf('资产编号已存在') !== -1) {
                         alert('资产编号已存在，请更换');
                     } else {
                         alert('编辑失败');
                     }
-                });
+                } catch (error) {
+                    console.error('编辑打印机失败:', error);
+                    alert('编辑失败');
+                }
             } else {
                 // 新增
-                fetch('../api/printer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                }).then(res => res.json()).then(res => {
-                    if (res.code === 0) {
+                try {
+                    const res = await apiRequest('../api/printer', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    if (res && res.code === 0) {
                         fetchPrinterList();
                         hidePrinterDrawer();
-                    } else if (res.msg && res.msg.indexOf('资产编号已存在') !== -1) {
+                    } else if (res && res.msg && res.msg.indexOf('资产编号已存在') !== -1) {
                         alert('资产编号已存在，请更换');
                     } else {
                         alert('新增失败');
                     }
-                });
+                } catch (error) {
+                    console.error('新增打印机失败:', error);
+                    alert('新增失败');
+                }
             }
         };
 
@@ -678,22 +722,24 @@
         document.getElementById('deletePrinterModal').addEventListener('mousedown', function(e) {
             if (e.target === this) this.classList.remove('show');
         });
-        document.getElementById('deletePrinterModalOkBtn').onclick = function() {
+        document.getElementById('deletePrinterModalOkBtn').onclick = async function() {
             const id = currentDeleteId;
-            fetch(`../api/printer/${id}`, { method: 'DELETE' })
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0) {
-                        fetchPrinterList();
-                        document.getElementById('deletePrinterModal').classList.remove('show');
-                    } else {
-                        alert('删除失败');
-                    }
-                });
+            try {
+                const res = await apiRequest(`../api/printer/${id}`, { method: 'DELETE' });
+                if (res && res.code === 0) {
+                    fetchPrinterList();
+                    document.getElementById('deletePrinterModal').classList.remove('show');
+                } else {
+                    alert('删除失败');
+                }
+            } catch (error) {
+                console.error('删除打印机失败:', error);
+                alert('删除失败');
+            }
         };
 
         // 批量删除
-        document.getElementById('batchDeletePrinterBtn').onclick = function() {
+        document.getElementById('batchDeletePrinterBtn').onclick = async function() {
             const checkedBoxes = Array.from(document.querySelectorAll('.rowPrinterCheckbox')).filter(cb => cb.checked);
             if (checkedBoxes.length === 0) {
                 alert('请先选择要删除的打印机');
@@ -701,17 +747,20 @@
             }
             if (!confirm(`确定要删除选中的${checkedBoxes.length}项吗？`)) return;
             const ids = checkedBoxes.map(cb => cb.getAttribute('data-id'));
-            fetch('../api/printer/batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids })
-            }).then(res => res.json()).then(res => {
-                if (res.code === 0) {
+            try {
+                const res = await apiRequest('../api/printer/batch', {
+                    method: 'POST',
+                    body: JSON.stringify({ ids })
+                });
+                if (res && res.code === 0) {
                     fetchPrinterList();
                 } else {
                     alert('批量删除失败');
                 }
-            });
+            } catch (error) {
+                console.error('批量删除打印机失败:', error);
+                alert('批量删除失败');
+            }
         };
 
         // 导入/导出按钮
@@ -797,46 +846,59 @@
                 });
                 // 批量导入到后端
                 console.log('准备导入数据:', importData);
-                fetch('../api/printer/import', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ list: importData })
-                })
-                .then(res => {
-                    console.log('导入响应状态:', res.status);
-                    if (!res.ok) {
-                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-                    }
-                    return res.text();
-                })
-                .then(text => {
-                    console.log('导入原始响应:', text);
+                
+                async function performImport() {
                     try {
-                        const res = JSON.parse(text);
-                        console.log('导入解析后响应:', res);
-                        if (res.code === 0) {
-                            let message = `导入完成：成功${res.success}条，失败${res.fail}条`;
-                            if (res.errors && res.errors.length > 0) {
-                                message += '\n\n失败详情:\n' + res.errors.slice(0, 10).join('\n');
-                                if (res.errors.length > 10) {
-                                    message += '\n... 还有 ' + (res.errors.length - 10) + ' 个错误';
-                                }
-                            }
-                            alert(message);
-                            fetchPrinterList();
-                        } else {
-                            console.error('导入失败:', res);
-                            alert('导入失败：' + (res.msg || '未知错误'));
+                        const response = await fetch('../api/printer/import', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ list: importData })
+                        });
+                        
+                        console.log('导入响应状态:', response.status);
+                        
+                        // 如果是401错误，表示会话过期，重定向到登录页
+                        if (response.status === 401) {
+                            console.log('会话已过期，正在重定向到登录页...');
+                            window.location.href = '/login.html';
+                            return;
                         }
-                    } catch (e) {
-                        console.error('JSON解析失败:', e, '原始响应:', text);
-                        alert('服务器响应格式错误：' + text.substring(0, 200));
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        const text = await response.text();
+                        console.log('导入原始响应:', text);
+                        try {
+                            const res = JSON.parse(text);
+                            console.log('导入解析后响应:', res);
+                            if (res.code === 0) {
+                                let message = `导入完成：成功${res.success}条，失败${res.fail}条`;
+                                if (res.errors && res.errors.length > 0) {
+                                    message += '\n\n失败详情:\n' + res.errors.slice(0, 10).join('\n');
+                                    if (res.errors.length > 10) {
+                                        message += '\n... 还有 ' + (res.errors.length - 10) + ' 个错误';
+                                    }
+                                }
+                                alert(message);
+                                fetchPrinterList();
+                            } else {
+                                console.error('导入失败:', res);
+                                alert('导入失败：' + (res.msg || '未知错误'));
+                            }
+                        } catch (e) {
+                            console.error('JSON解析失败:', e, '原始响应:', text);
+                            alert('服务器响应格式错误：' + text.substring(0, 200));
+                        }
+                    } catch (error) {
+                        console.error('导入请求失败:', error);
+                        alert('导入请求失败：' + error.message);
                     }
-                })
-                .catch(error => {
-                    console.error('导入请求失败:', error);
-                    alert('导入请求失败：' + error.message);
-                });
+                }
+                
+                performImport();
             };
             reader.readAsArrayBuffer(file);
         }

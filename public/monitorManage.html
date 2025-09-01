@@ -289,6 +289,25 @@
         </div>
     </div>
     <script>
+        // 统一API请求函数
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...options.headers }
+            };
+            try {
+                const response = await fetch(url, { ...defaultOptions, ...options });
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                return { code: -1, msg: '网络错误' };
+            }
+        }
+
         // 数据变量
         let monitorList = [];
         let filteredList = [];
@@ -459,45 +478,43 @@
         };
 
         // 品牌下拉框渲染
-        function renderMonitorBrandSelect(selectId, selectedValue) {
-            fetch('../api/brand?type=monitor')
-                .then(res => res.json())
-                .then(res => {
-                    const select = document.getElementById(selectId);
-                    select.innerHTML = '<option value="">请选择品牌</option>';
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        res.data.forEach(item => {
-                            const opt = document.createElement('option');
-                            opt.value = item.name;
-                            opt.textContent = item.name;
-                            select.appendChild(opt);
-                        });
-                        if (selectedValue) {
-                            select.value = selectedValue;
-                        }
+        async function renderMonitorBrandSelect(selectId, selectedValue) {
+            const res = await apiRequest('../api/brand?type=monitor');
+            if (res) {
+                const select = document.getElementById(selectId);
+                select.innerHTML = '<option value="">请选择品牌</option>';
+                if (res.code === 0 && Array.isArray(res.data)) {
+                    res.data.forEach(item => {
+                        const opt = document.createElement('option');
+                        opt.value = item.name;
+                        opt.textContent = item.name;
+                        select.appendChild(opt);
+                    });
+                    if (selectedValue) {
+                        select.value = selectedValue;
                     }
-                });
+                }
+            }
         }
 
         // 部门下拉框渲染
-        function renderDepartmentSelect(selectId, selectedValue) {
-            fetch('../api/department')
-                .then(res => res.json())
-                .then(res => {
-                    const select = document.getElementById(selectId);
-                    select.innerHTML = '<option value="">请选择部门</option>';
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        res.data.forEach(item => {
-                            const opt = document.createElement('option');
-                            opt.value = item.name;
-                            opt.textContent = item.name;
-                            select.appendChild(opt);
-                        });
-                        if (selectedValue) {
-                            select.value = selectedValue;
-                        }
+        async function renderDepartmentSelect(selectId, selectedValue) {
+            const res = await apiRequest('../api/department');
+            if (res) {
+                const select = document.getElementById(selectId);
+                select.innerHTML = '<option value="">请选择部门</option>';
+                if (res.code === 0 && Array.isArray(res.data)) {
+                    res.data.forEach(item => {
+                        const opt = document.createElement('option');
+                        opt.value = item.name;
+                        opt.textContent = item.name;
+                        select.appendChild(opt);
+                    });
+                    if (selectedValue) {
+                        select.value = selectedValue;
                     }
-                });
+                }
+            }
         }
 
         // 新增弹窗逻辑
@@ -582,49 +599,34 @@
         });
 
         // 新增/编辑/删除/批量删除操作（需后端API支持）
-        function addMonitor(data, cb) {
-            fetch('../api/monitor', {
+        async function addMonitor(data, cb) {
+            const res = await apiRequest('../api/monitor', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) fetchMonitorList();
-                if (cb) cb(res);
             });
+            if (res && res.code === 0) fetchMonitorList();
+            if (cb) cb(res);
         }
-        function editMonitor(id, data, cb) {
-            fetch('../api/monitor/' + id, {
+        async function editMonitor(id, data, cb) {
+            const res = await apiRequest('../api/monitor/' + id, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) fetchMonitorList();
-                if (cb) cb(res);
             });
+            if (res && res.code === 0) fetchMonitorList();
+            if (cb) cb(res);
         }
-        function deleteMonitor(id, cb) {
-            fetch('../api/monitor/' + id, { method: 'DELETE' })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) fetchMonitorList();
-                if (cb) cb(res);
-            });
+        async function deleteMonitor(id, cb) {
+            const res = await apiRequest('../api/monitor/' + id, { method: 'DELETE' });
+            if (res && res.code === 0) fetchMonitorList();
+            if (cb) cb(res);
         }
-        function batchDeleteMonitor(ids, cb) {
-            fetch('../api/monitor/batch', {
+        async function batchDeleteMonitor(ids, cb) {
+            const res = await apiRequest('../api/monitor/batch', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids })
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) fetchMonitorList();
-                if (cb) cb(res);
             });
+            if (res && res.code === 0) fetchMonitorList();
+            if (cb) cb(res);
         }
 
         // 新增表单提交
@@ -681,22 +683,19 @@
         };
 
         // 查询数据并渲染
-        function fetchMonitorList() {
-            fetch('../api/monitor')
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        monitorList = res.data;
-                        filteredList = monitorList;
-                        renderMonitorTablePage();
-                        renderMonitorStats(monitorList);
-                    } else {
-                        monitorList = [];
-                        filteredList = [];
-                        renderMonitorTablePage();
-                        renderMonitorStats([]);
-                    }
-                });
+        async function fetchMonitorList() {
+            const res = await apiRequest('../api/monitor');
+            if (res && res.code === 0 && Array.isArray(res.data)) {
+                monitorList = res.data;
+                filteredList = monitorList;
+                renderMonitorTablePage();
+                renderMonitorStats(monitorList);
+            } else {
+                monitorList = [];
+                filteredList = [];
+                renderMonitorTablePage();
+                renderMonitorStats([]);
+            }
         }
 
         // 页面加载时自动获取数据

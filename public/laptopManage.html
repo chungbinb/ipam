@@ -425,6 +425,25 @@
         </div>
     </div>
     <script>
+        // 统一API请求函数
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...options.headers }
+            };
+            try {
+                const response = await fetch(url, { ...defaultOptions, ...options });
+                if (response.status === 401) {
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                return { code: -1, msg: '网络错误' };
+            }
+        }
+
         // 数据操作API地址
         const API_BASE = '../api/laptop';
 
@@ -569,76 +588,60 @@
         };
 
         // 查询数据并渲染
-        function fetchLaptopList(query = {}) {
-            $.get(API_BASE, query, function(res) {
-                // 调试输出
-                console.log('fetchLaptopList返回:', res);
-                // 兼容后端返回多次JSON（如 {"code":0,"data":[...]}{"code":0,"data":[...]})
-                if (typeof res === 'string') {
-                    // 只取第一个JSON对象
-                    try {
-                        res = JSON.parse(res.match(/^\{.*?\}\s*/)[0]);
-                    } catch (e) {
-                        console.error('JSON解析失败:', res);
-                        laptopList = [];
-                        filteredList = [];
-                        renderLaptopStats([]);
-                        renderLaptopTable([]);
-                        return;
-                    }
-                }
-                if (res.code === 0 && Array.isArray(res.data)) {
-                    laptopList = res.data;
-                    filteredList = laptopList;
-                    renderLaptopTablePage();
-                    renderLaptopStats(laptopList);
-                } else {
-                    laptopList = [];
-                    filteredList = [];
-                    renderLaptopTablePage();
-                    renderLaptopStats([]);
-                }
-            });
+        async function fetchLaptopList(query = {}) {
+            let res;
+            if (Object.keys(query).length === 0) {
+                res = await apiRequest(API_BASE);
+            } else {
+                const params = new URLSearchParams(query);
+                res = await apiRequest(API_BASE + '?' + params.toString());
+            }
+            
+            // 调试输出
+            console.log('fetchLaptopList返回:', res);
+            
+            if (res && res.code === 0 && Array.isArray(res.data)) {
+                laptopList = res.data;
+                filteredList = laptopList;
+                renderLaptopTablePage();
+                renderLaptopStats(laptopList);
+            } else {
+                laptopList = [];
+                filteredList = [];
+                renderLaptopTablePage();
+                renderLaptopStats([]);
+            }
         }
 
         // 新增/编辑/删除操作
-        function addLaptop(data, cb) {
-            $.post(API_BASE, data, function(res) {
-                if (res.code === 0) fetchLaptopList();
-                if (cb) cb(res);
+        async function addLaptop(data, cb) {
+            const res = await apiRequest(API_BASE, {
+                method: 'POST',
+                body: JSON.stringify(data)
             });
+            if (res && res.code === 0) fetchLaptopList();
+            if (cb) cb(res);
         }
-        function editLaptop(id, data, cb) {
-            $.ajax({
-                url: API_BASE + '/' + id,
-                type: 'PUT',
-                data: data,
-                success: function(res) {
-                    if (res.code === 0) fetchLaptopList();
-                    if (cb) cb(res);
-                }
+        async function editLaptop(id, data, cb) {
+            const res = await apiRequest(API_BASE + '/' + id, {
+                method: 'PUT',
+                body: JSON.stringify(data)
             });
+            if (res && res.code === 0) fetchLaptopList();
+            if (cb) cb(res);
         }
-        function deleteLaptop(id, cb) {
-            $.ajax({
-                url: API_BASE + '/' + id,
-                type: 'DELETE',
-                success: function(res) {
-                    if (res.code === 0) fetchLaptopList();
-                    if (cb) cb(res);
-                }
-            });
+        async function deleteLaptop(id, cb) {
+            const res = await apiRequest(API_BASE + '/' + id, { method: 'DELETE' });
+            if (res && res.code === 0) fetchLaptopList();
+            if (cb) cb(res);
         }
-        function batchDeleteLaptop(ids, cb) {
-            $.ajax({
-                url: API_BASE + '/batch',
-                type: 'POST',
-                data: { ids: ids },
-                success: function(res) {
-                    if (res.code === 0) fetchLaptopList();
-                    if (cb) cb(res);
-                }
+        async function batchDeleteLaptop(ids, cb) {
+            const res = await apiRequest(API_BASE + '/batch', {
+                method: 'POST',
+                body: JSON.stringify({ ids })
             });
+            if (res && res.code === 0) fetchLaptopList();
+            if (cb) cb(res);
         }
 
         // 查询表单
@@ -785,39 +788,6 @@
         // 初始化数据变量
         let laptopList = [];
 
-        // 查询数据并渲染
-        function fetchLaptopList(query = {}) {
-            $.get(API_BASE, query, function(res) {
-                // 调试输出
-                console.log('fetchLaptopList返回:', res);
-                // 兼容后端返回多次JSON（如 {"code":0,"data":[...]}{"code":0,"data":[...]})
-                if (typeof res === 'string') {
-                    // 只取第一个JSON对象
-                    try {
-                        res = JSON.parse(res.match(/^\{.*?\}\s*/)[0]);
-                    } catch (e) {
-                        console.error('JSON解析失败:', res);
-                        laptopList = [];
-                        filteredList = [];
-                        renderLaptopStats([]);
-                        renderLaptopTable([]);
-                        return;
-                    }
-                }
-                if (res.code === 0 && Array.isArray(res.data)) {
-                    laptopList = res.data;
-                    filteredList = laptopList;
-                    renderLaptopTablePage();
-                    renderLaptopStats(laptopList);
-                } else {
-                    laptopList = [];
-                    filteredList = [];
-                    renderLaptopTablePage();
-                    renderLaptopStats([]);
-                }
-            });
-        }
-
         // 页面加载时自动获取数据（只绑定一次，避免重复调用）
         let hasLoaded = false;
         document.addEventListener('DOMContentLoaded', function() {
@@ -862,23 +832,19 @@
         });
 
         // 检查资产编号是否重复
-        function checkAssetIdDuplicate(assetId, excludeId, cb) {
-            $.get(API_BASE, { assetId: assetId }, function(res) {
-                if (typeof res === 'string') {
-                    try { res = JSON.parse(res.match(/^\{.*?\}\s*/)[0]); } catch {}
-                }
-                if (res.code === 0 && Array.isArray(res.data)) {
-                    // 排除自身id（编辑时）
-                    const exists = res.data.some(item => item.asset_id === assetId && (!excludeId || item.id != excludeId));
-                    cb && cb(exists);
-                } else {
-                    cb && cb(false);
-                }
-            });
+        async function checkAssetIdDuplicate(assetId, excludeId, cb) {
+            const res = await apiRequest(API_BASE + '?assetId=' + encodeURIComponent(assetId));
+            if (res && res.code === 0 && Array.isArray(res.data)) {
+                // 排除自身id（编辑时）
+                const exists = res.data.some(item => item.asset_id === assetId && (!excludeId || item.id != excludeId));
+                cb && cb(exists);
+            } else {
+                cb && cb(false);
+            }
         }
 
         // 新增弹窗表单提交（使用JSON，允许部分字段为空）
-        document.getElementById('addLaptopForm').onsubmit = function(e) {
+        document.getElementById('addLaptopForm').onsubmit = async function(e) {
             e.preventDefault();
             const fd = new FormData(this);
             let data = {};
@@ -908,17 +874,12 @@
                 if (data.user) payload.user = data.user;
                 if (data.status) payload.status = data.status;
                 if (data.remark) payload.remark = data.remark;
-                $.ajax({
-                    url: API_BASE,
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify(payload),
-                    success: function(res) {
-                        if (res.code === 0) {
-                            hideDrawer();
-                            document.getElementById('successModal').style.display = 'block';
-                            fetchLaptopList();
-                        }
+                
+                addLaptop(payload, function(res) {
+                    if (res && res.code === 0) {
+                        hideDrawer();
+                        document.getElementById('successModal').style.display = 'block';
+                        fetchLaptopList();
                     }
                 });
             });
@@ -956,16 +917,10 @@
                 if (data.user) payload.user = data.user;
                 if (data.status) payload.status = data.status;
                 if (data.remark) payload.remark = data.remark;
-                $.ajax({
-                    url: API_BASE + '/' + id,
-                    type: 'PUT',
-                    contentType: 'application/json',
-                    data: JSON.stringify(payload),
-                    success: function(res) {
-                        if (res.code === 0) {
-                            hideEditDrawer();
-                            fetchLaptopList();
-                        }
+                
+                editLaptop(id, payload, function(res) {
+                    if (res && res.code === 0) {
+                        hideEditDrawer();
                     }
                 });
             });

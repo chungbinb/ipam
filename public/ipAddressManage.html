@@ -399,26 +399,59 @@
         </div>
     </div>
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         let ipAddrList = [];
         let currentPage = 1;
         let pageSize = 10;
         let filteredList = [];
 
-        function fetchIpAddrs() {
-            fetch('../api/ip-addresses')
-                .then(res => res.json())
-                .then(data => {
-                    ipAddrList = Array.isArray(data) ? data : [];
-                    renderIpAddrStats();
-                    filteredList = ipAddrList;
-                    renderIpAddrTablePage();
-                })
-                .catch(() => {
-                    ipAddrList = [];
-                    renderIpAddrStats();
-                    filteredList = [];
-                    renderIpAddrTablePage();
-                });
+        async function fetchIpAddrs() {
+            try {
+                const data = await apiRequest('../api/ip-addresses');
+                ipAddrList = Array.isArray(data) ? data : [];
+                renderIpAddrStats();
+                filteredList = ipAddrList;
+                renderIpAddrTablePage();
+            } catch (error) {
+                console.error('获取IP地址列表失败:', error);
+                ipAddrList = [];
+                renderIpAddrStats();
+                filteredList = [];
+                renderIpAddrTablePage();
+            }
         }
 
         function renderIpAddrStats() {

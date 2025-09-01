@@ -286,35 +286,67 @@
         </div>
     </div>
     <script>
+        // 统一的API请求函数，自动处理身份验证和会话过期
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            
+            try {
+                const response = await fetch(url, finalOptions);
+                
+                // 如果是401错误，表示会话过期，重定向到登录页
+                if (response.status === 401) {
+                    console.log('会话已过期，正在重定向到登录页...');
+                    window.location.href = '/login.html';
+                    return null;
+                }
+                
+                // 检查响应是否成功
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
         // 全局变量
         let serverList = [];
         let filteredList = [];
 
         // 获取服务器列表
-        function fetchServerList() {
-            fetch('../api/server')
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        serverList = res.data;
-                        filteredList = serverList;
-                        renderServerStats(serverList);
-                        renderServerTable(serverList);
-                    } else {
-                        serverList = [];
-                        filteredList = [];
-                        renderServerStats([]);
-                        renderServerTable([]);
-                        console.error('获取服务器列表失败:', res);
-                    }
-                })
-                .catch(err => {
-                    console.error('获取服务器列表异常:', err);
+        async function fetchServerList() {
+            try {
+                const res = await apiRequest('../api/server');
+                if (res && res.code === 0 && Array.isArray(res.data)) {
+                    serverList = res.data;
+                    filteredList = serverList;
+                    renderServerStats(serverList);
+                    renderServerTable(serverList);
+                } else {
                     serverList = [];
                     filteredList = [];
                     renderServerStats([]);
                     renderServerTable([]);
-                });
+                    console.error('获取服务器列表失败:', res);
+                }
+            } catch (error) {
+                console.error('获取服务器列表异常:', error);
+                serverList = [];
+                filteredList = [];
+                renderServerStats([]);
+                renderServerTable([]);
+            }
         }
 
         function renderServerStats(list) {
@@ -422,42 +454,36 @@
         };
 
         // 服务器操作函数
-        function connectServer(id) {
-            fetch(`../api/server/${id}/connect`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) {
+        async function connectServer(id) {
+            try {
+                const res = await apiRequest(`../api/server/${id}/connect`, {
+                    method: 'POST'
+                });
+                if (res && res.code === 0) {
                     showModal('连接操作已记录到日志');
                 } else {
-                    showModal('连接失败: ' + (res.msg || '未知错误'));
+                    showModal('连接失败: ' + (res?.msg || '未知错误'));
                 }
-            })
-            .catch(err => {
-                console.error('连接服务器失败:', err);
+            } catch (error) {
+                console.error('连接服务器失败:', error);
                 showModal('连接失败: 网络错误');
-            });
+            }
         }
 
-        function scanPorts(id) {
-            fetch(`../api/server/${id}/scan`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.code === 0) {
+        async function scanPorts(id) {
+            try {
+                const res = await apiRequest(`../api/server/${id}/scan`, {
+                    method: 'POST'
+                });
+                if (res && res.code === 0) {
                     showModal('端口扫描操作已记录到日志');
                 } else {
-                    showModal('端口扫描失败: ' + (res.msg || '未知错误'));
+                    showModal('端口扫描失败: ' + (res?.msg || '未知错误'));
                 }
-            })
-            .catch(err => {
-                console.error('端口扫描失败:', err);
+            } catch (error) {
+                console.error('端口扫描失败:', error);
                 showModal('端口扫描失败: 网络错误');
-            });
+            }
         }
 
         function editServer(id) {
@@ -486,27 +512,25 @@
             }
         }
 
-        function deleteServer(id) {
+        async function deleteServer(id) {
             const server = serverList.find(s => s.id == id);
             const serverName = server ? (server.hostname || server.ip) : `ID:${id}`;
             
-            showModal(`确定要删除服务器 "${serverName}" 吗？`, function() {
-                fetch(`../api/server/${id}`, {
-                    method: 'DELETE'
-                })
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0) {
+            showModal(`确定要删除服务器 "${serverName}" 吗？`, async function() {
+                try {
+                    const res = await apiRequest(`../api/server/${id}`, {
+                        method: 'DELETE'
+                    });
+                    if (res && res.code === 0) {
                         showModal('删除成功');
                         fetchServerList();
                     } else {
-                        showModal('删除失败: ' + (res.msg || '未知错误'));
+                        showModal('删除失败: ' + (res?.msg || '未知错误'));
                     }
-                })
-                .catch(err => {
-                    console.error('删除服务器失败:', err);
+                } catch (error) {
+                    console.error('删除服务器失败:', error);
                     showModal('删除失败: 网络错误');
-                });
+                }
             });
         }
 
@@ -554,7 +578,7 @@
         };
 
         // 处理服务器表单提交
-        document.getElementById('serverForm').onsubmit = function(e) {
+        document.getElementById('serverForm').onsubmit = async function(e) {
             e.preventDefault();
             
             const form = e.target;
@@ -568,27 +592,23 @@
                 data[key] = value;
             }
             
-            fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(res => {
-                if (res.code === 0) {
+            try {
+                const res = await apiRequest(url, {
+                    method: method,
+                    body: JSON.stringify(data)
+                });
+                
+                if (res && res.code === 0) {
                     showModal(isEdit ? '服务器更新成功' : '服务器创建成功');
                     document.getElementById('serverFormModal').style.display = 'none';
                     fetchServerList(); // 刷新列表
                 } else {
-                    showModal('操作失败: ' + (res.msg || '未知错误'));
+                    showModal('操作失败: ' + (res?.msg || '未知错误'));
                 }
-            })
-            .catch(err => {
-                console.error('操作失败:', err);
+            } catch (error) {
+                console.error('操作失败:', error);
                 showModal('操作失败: 网络错误');
-            });
+            }
         };
 
         // 初始化页面

@@ -360,10 +360,11 @@
 </div>
 <!-- //右侧框架内容结束 -->
 
-<script>
-    // 菜单点击切换iframe页面
+<script>    // 菜单点击切换iframe页面
     $(function() {        // 获取当前用户信息
-        fetch('../api/auth/check')
+        fetch('../api/auth/check', {
+            credentials: 'include'
+        })
             .then(res => res.json())
             .then(data => {
                 if (data.code === 0 && data.data.logged_in) {

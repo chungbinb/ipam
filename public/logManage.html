@@ -24,13 +24,18 @@
             font-size: 14px;
         }
         .stats-container { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-            gap: 20px; 
-            margin-bottom: 30px; 
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 15px; 
+            margin-bottom: 30px;
+            padding-bottom: 5px;
         }
         .stat-card { 
-            padding: 20px; 
+            flex: 0 0 auto;
+            min-width: 120px;
+            max-width: 150px;
+            padding: 15px 10px; 
             border-radius: 8px; 
             box-shadow: 0 2px 8px rgba(0,0,0,0.15); 
             border: 1px solid rgba(255,255,255,0.2);
@@ -41,8 +46,8 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
-        .stat-card h3 { margin: 0 0 10px 0; font-size: 14px; font-weight: 500; }
-        .stat-card .number { font-size: 24px; font-weight: bold; }
+        .stat-card h3 { margin: 0 0 8px 0; font-size: 12px; font-weight: 500; }
+        .stat-card .number { font-size: 20px; font-weight: bold; }
         .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
         .btn { 
             background: #007bff; 
@@ -72,9 +77,11 @@
             border: 1px solid #e0e0e0; 
             padding: 10px 12px; 
             text-align: left; 
-            white-space: pre-wrap; 
-            word-break: break-word; 
-            vertical-align: top;
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            vertical-align: middle;
+            max-width: 200px;
         }
         th { background: #f4f6fa; font-weight: 500; }
         tbody tr:nth-child(odd) { background: #f8f9fa; }
@@ -92,8 +99,11 @@
                 padding: 20px; 
             }
             .stats-container { 
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
                 gap: 15px; 
+            }
+            .stat-card {
+                min-width: 130px;
+                padding: 15px;
             }
         }
         
@@ -103,12 +113,30 @@
                 padding: 15px; 
             }
             .stats-container { 
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
                 gap: 10px; 
+            }
+            .stat-card {
+                min-width: 100px;
+                padding: 12px;
+            }
+            .stat-card h3 {
+                font-size: 12px;
+            }
+            .stat-card .number {
+                font-size: 20px;
             }
             th, td { 
                 padding: 8px 10px; 
                 font-size: 13px; 
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .stats-container {
+                flex-direction: column;
+            }
+            .stat-card {
+                min-width: auto;
             }
         }
         
@@ -189,6 +217,28 @@
         let currentLogType = 'operation';
         let currentFilter = null; // 当前筛选条件
 
+        /**
+         * 统一的API请求函数，自动处理认证和错误
+         */
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...options.headers }
+            };
+
+            try {
+                const response = await fetch(url, { ...defaultOptions, ...options });
+                if (response.status === 401) {
+                    window.location.href = '../public/login.html';
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                return { code: -1, msg: '网络错误' };
+            }
+        }
+
         function openTab(evt, logType) {
             let i, tabcontent, tablinks;
             tabcontent = document.getElementsByClassName("tab-content");
@@ -212,7 +262,7 @@
             fetchLogs(logType, currentFilter);
         }
 
-        function fetchLogs(logType, filter = null) {
+        async function fetchLogs(logType, filter = null) {
             let url = '../api/logs?log_type=' + logType;
             
             // 添加筛选参数
@@ -224,37 +274,23 @@
                 }
             }
             
-            fetch(url)
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0 && Array.isArray(res.data)) {
-                        renderLogTable(logType, res.data, filter);
-                    } else {
-                        console.error('获取日志失败:', res);
-                    }
-                })
-                .catch(err => {
-                    console.error('请求日志失败:', err);
-                });
+            const res = await apiRequest(url);
+            if (res && res.code === 0 && Array.isArray(res.data)) {
+                renderLogTable(logType, res.data, filter);
+            } else if (res) {
+                console.error('获取日志失败:', res);
+            }
         }
 
-        function fetchStatistics() {
-            fetch('../api/logs/statistics')
-                .then(res => res.json())
-                .then(res => {
-                    if (res.code === 0) {
-                        renderStatistics(res.data);
-                    } else {
-                        console.error('获取统计数据失败:', res);
-                        const container = document.getElementById('statsContainer');
-                        container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">获取统计数据失败: ' + (res.msg || '未知错误') + '</div>';
-                    }
-                })
-                .catch(err => {
-                    console.error('获取统计失败:', err);
-                    const container = document.getElementById('statsContainer');
-                    container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">网络请求失败: ' + err.message + '</div>';
-                });
+        async function fetchStatistics() {
+            const res = await apiRequest('../api/logs/statistics');
+            if (res && res.code === 0) {
+                renderStatistics(res.data);
+            } else if (res) {
+                console.error('获取统计数据失败:', res);
+                const container = document.getElementById('statsContainer');
+                container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">获取统计数据失败: ' + (res.msg || '未知错误') + '</div>';
+            }
         }
 
         function renderStatistics(stats) {
@@ -383,8 +419,8 @@
             }
             
             card.innerHTML = `
-                <h3 style="color: ${textColor}; margin: 0 0 10px 0; font-size: 14px; font-weight: 500;">${title}</h3>
-                <div class="number" style="color: ${textColor}; font-size: 24px; font-weight: bold;">${number}</div>
+                <h3 style="color: ${textColor}; margin: 0 0 8px 0; font-size: 12px; font-weight: 500;">${title}</h3>
+                <div class="number" style="color: ${textColor}; font-size: 20px; font-weight: bold;">${number}</div>
             `;
             return card;
         }
@@ -615,46 +651,34 @@
             }
         }
 
-        function cleanupLogs() {
+        async function cleanupLogs() {
             // 首先检查用户是否有权限
-            fetch('../api/auth/check')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.code !== 0 || !data.data.logged_in) {
-                        alert('请先登录');
-                        return;
-                    }
-                    
-                    const user = data.data.user;
-                    if (user.role !== 'sysadmin' && user.role !== 'admin') {
-                        alert('权限不足，只有管理员以上权限才能清理日志');
-                        return;
-                    }
-                    
-                    // 有权限则继续执行清理操作
-                    if (!confirm('确定要清理30天前的旧日志吗？此操作不可恢复。')) {
-                        return;
-                    }
+            const data = await apiRequest('../api/auth/check');
+            if (!data || data.code !== 0 || !data.data.logged_in) {
+                alert('请先登录');
+                return;
+            }
+            
+            const user = data.data.user;
+            if (user.role !== 'sysadmin' && user.role !== 'admin') {
+                alert('权限不足，只有管理员以上权限才能清理日志');
+                return;
+            }
+            
+            // 有权限则继续执行清理操作
+            if (!confirm('确定要清理30天前的旧日志吗？此操作不可恢复。')) {
+                return;
+            }
 
-                    fetch('../api/logs/cleanup?days=30', { method: 'POST' })
-                        .then(res => res.json())
-                        .then(res => {
-                            if (res.code === 0) {
-                                alert(res.msg);
-                                refreshLogs();
-                            } else {
-                                alert('清理失败：' + (res.msg || '未知错误'));
-                            }
-                        })
-                        .catch(err => {
-                            console.error('清理请求失败:', err);
-                            alert('清理请求失败');
-                        });
-                })
-                .catch(err => {
-                    console.error('权限检查失败:', err);
-                    alert('权限检查失败');
-                });
+            const res = await apiRequest('../api/logs/cleanup?days=30', { 
+                method: 'POST'
+            });
+            if (res && res.code === 0) {
+                alert(res.msg);
+                refreshLogs();
+            } else if (res) {
+                alert('清理失败：' + (res.msg || '未知错误'));
+            }
         }
 
         /**
@@ -663,32 +687,26 @@
         /**
          * 强制刷新统计数据
          */
-        function forceRefreshStats() {
+        async function forceRefreshStats() {
             console.log('强制刷新统计数据...');
             const container = document.getElementById('statsContainer');
             container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">正在刷新统计数据...</div>';
             
             // 清除可能的缓存
-            fetch('../api/logs/statistics?_t=' + Date.now(), {
+            const res = await apiRequest('../api/logs/statistics?_t=' + Date.now(), {
                 cache: 'no-cache',
                 headers: {
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache'
                 }
-            })
-                .then(res => res.json())
-                .then(res => {
-                    console.log('强制刷新统计结果:', res);
-                    if (res.code === 0) {
-                        renderStatistics(res.data);
-                    } else {
-                        container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">强制刷新失败: ' + (res.msg || '未知错误') + '</div>';
-                    }
-                })
-                .catch(err => {
-                    console.error('强制刷新统计失败:', err);
-                    container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">强制刷新网络错误: ' + err.message + '</div>';
-                });
+            });
+            
+            console.log('强制刷新统计结果:', res);
+            if (res && res.code === 0) {
+                renderStatistics(res.data);
+            } else if (res) {
+                container.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">强制刷新失败: ' + (res.msg || '未知错误') + '</div>';
+            }
         }
 
         // 页面加载时初始化
@@ -712,35 +730,24 @@
         });
 
         // 检查用户权限
-        function checkUserPermissions() {
-            fetch('../api/auth/check')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.code === 0 && data.data.logged_in) {
-                        const user = data.data.user;
-                        // 只有管理员以上权限（sysadmin, admin）才能看到清理按钮
-                        // 网管（netadmin）不能清理日志
-                        const canCleanup = user.role === 'sysadmin' || user.role === 'admin';
-                        const cleanupBtn = document.getElementById('cleanupBtn');
-                        if (cleanupBtn) {
-                            cleanupBtn.style.display = canCleanup ? 'inline-block' : 'none';
-                        }
-                    } else {
-                        // 未登录或获取用户信息失败，隐藏清理按钮
-                        const cleanupBtn = document.getElementById('cleanupBtn');
-                        if (cleanupBtn) {
-                            cleanupBtn.style.display = 'none';
-                        }
-                    }
-                })
-                .catch(err => {
-                    console.error('获取用户权限失败:', err);
-                    // 出错时隐藏清理按钮
-                    const cleanupBtn = document.getElementById('cleanupBtn');
-                    if (cleanupBtn) {
-                        cleanupBtn.style.display = 'none';
-                    }
-                });
+        async function checkUserPermissions() {
+            const data = await apiRequest('../api/auth/check');
+            if (data && data.code === 0 && data.data.logged_in) {
+                const user = data.data.user;
+                // 只有管理员以上权限（sysadmin, admin）才能看到清理按钮
+                // 网管（netadmin）不能清理日志
+                const canCleanup = user.role === 'sysadmin' || user.role === 'admin';
+                const cleanupBtn = document.getElementById('cleanupBtn');
+                if (cleanupBtn) {
+                    cleanupBtn.style.display = canCleanup ? 'inline-block' : 'none';
+                }
+            } else if (data) {
+                // 未登录或获取用户信息失败，隐藏清理按钮
+                const cleanupBtn = document.getElementById('cleanupBtn');
+                if (cleanupBtn) {
+                    cleanupBtn.style.display = 'none';
+                }
+            }
         }
 
         // 显示日志详情弹窗

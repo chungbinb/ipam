@@ -5,8 +5,8 @@
 
 return [
     'name' => 'IT资产管理系统',
-    'version' => '1.1',
-    'build_date' => '2025-08-25',
+    'version' => '1.4',
+    'build_date' => '2025-09-01',
     'description' => '企业级IT资产管理系统',
     'author' => 'Development Team',
     'php_version' => '7.4+',

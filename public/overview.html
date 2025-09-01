@@ -55,7 +55,9 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            fetch('../api/overview/stats')
+            fetch('../api/overview/stats', {
+                credentials: 'include'
+            })
                 .then(res => res.json())
                 .then(res => {
                     if (res.code === 0) {
