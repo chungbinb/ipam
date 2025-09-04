@@ -215,7 +215,7 @@
         </form>
         <!-- 高级搜索区域，默认隐藏 -->
         <div id="advancedSearchPanel" style="display:none;margin-bottom:18px;padding:18px 24px;background:#fff;border-radius:8px;box-shadow:0 2px 8px #0001;">
-            <form id="hostAdvancedSearchForm" style="display:flex;flex-wrap:wrap;gap:16px;">
+            <form id="hostAdvancedSearchForm" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;">
                 <input type="text" name="department" placeholder="部门" style="width:160px;">
                 <input type="text" name="user" placeholder="使用人员" style="width:160px;">
                 <input type="text" name="cpu" placeholder="CPU" style="width:120px;">
@@ -229,8 +229,21 @@
                 <input type="text" name="account" placeholder="共享账号" style="width:140px;">
                 <input type="text" name="supplier" placeholder="供应商" style="width:120px;">
                 <input type="text" name="remark" placeholder="备注" style="width:120px;">
-                <button type="submit" style="background:#007bff;color:#fff;">精确查询</button>
-                <button type="button" id="resetAdvancedSearchBtn" style="background:#6c757d;color:#fff;">重置</button>
+                <div style="display:flex;gap:8px;margin-left:auto;align-items:center;">
+                    <button type="submit" style="background:#007bff;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:background-color 0.2s;box-shadow:0 2px 4px rgba(0,123,255,0.2);" onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="margin-right:6px;vertical-align:middle;">
+                            <circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="2"/>
+                            <line x1="15" y1="15" x2="19" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        精确查询
+                    </button>
+                    <button type="button" id="resetAdvancedSearchBtn" style="background:#6c757d;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:background-color 0.2s;box-shadow:0 2px 4px rgba(108,117,125,0.2);" onmouseover="this.style.background='#545b62'" onmouseout="this.style.background='#6c757d'">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="margin-right:6px;vertical-align:middle;">
+                            <path d="M4 4L16 16M16 4L4 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        重置
+                    </button>
+                </div>
             </form>
         </div>
         <!-- 操作按钮 -->
@@ -815,8 +828,17 @@
                     Object.keys(fieldMap).forEach(k => {
                         if (row[k] !== undefined) obj[fieldMap[k]] = row[k];
                     });
+                    
+                    // 数据清理：确保必填字段不为空
+                    if (!obj.department || obj.department.toString().trim() === '') {
+                        obj.department = '未指定部门';
+                    }
+                    if (!obj.user || obj.user.toString().trim() === '') {
+                        obj.user = '未指定用户';
+                    }
+                    
                     // 日期格式转换（只保留年月日，无时分秒）
-                    if (obj.updated_at) {
+                    if (obj.updated_at && obj.updated_at !== '') {
                         let val = obj.updated_at;
                         let d;
                         if (/^\d+$/.test(val)) {
@@ -831,39 +853,74 @@
                             let m = d.getMonth() + 1;
                             let day = d.getDate();
                             obj.updated_at = `${y}/${m}/${day}`;
+                        } else {
+                            // 无效日期，删除该字段让后端使用当前时间
+                            delete obj.updated_at;
                         }
+                    } else {
+                        // 空日期，删除该字段让后端使用当前时间
+                        delete obj.updated_at;
                     }
                     return obj;
                 });
-                // 批量导入（逐条POST，或可改为后端批量接口）
-                let successCount = 0;
-                let failCount = 0;
-                let total = importData.length;
-                let finished = 0;
-                importData.forEach(async item => {
-                    try {
-                        const res = await apiRequest('../api/host', {
-                            method: 'POST',
-                            body: JSON.stringify(item)
-                        });
-                        finished++;
-                        if (res && res.code === 0) successCount++;
-                        else failCount++;
-                        if (finished === total) {
-                            alert(`导入完成：成功${successCount}条，失败${failCount}条`);
-                            fetchHostList();
-                        }
-                    } catch (error) {
-                        finished++;
-                        failCount++;
-                        if (finished === total) {
-                            alert(`导入完成：成功${successCount}条，失败${failCount}条`);
-                            fetchHostList();
-                        }
-                    }
-                });
+                
+                // 批量导入（改为顺序处理，避免并发导致的问题）
+                importHostDataSequentially(importData);
             };
             reader.readAsArrayBuffer(file);
+        }
+
+        // 新增：顺序导入主机数据
+        async function importHostDataSequentially(importData) {
+            let successCount = 0;
+            let failCount = 0;
+            let total = importData.length;
+            let errorDetails = [];
+            
+            console.log(`开始导入 ${total} 条主机数据...`);
+            
+            for (let i = 0; i < importData.length; i++) {
+                const item = importData[i];
+                try {
+                    console.log(`正在导入第 ${i + 1}/${total} 条数据...`);
+                    const res = await apiRequest('../api/host', {
+                        method: 'POST',
+                        body: JSON.stringify(item)
+                    });
+                    
+                    if (res && res.code === 0) {
+                        successCount++;
+                        console.log(`第 ${i + 1} 条导入成功`);
+                    } else {
+                        failCount++;
+                        const errorMsg = res?.msg || '未知错误';
+                        errorDetails.push(`第 ${i + 1} 条: ${errorMsg}`);
+                        console.error(`第 ${i + 1} 条导入失败: ${errorMsg}`);
+                    }
+                } catch (error) {
+                    failCount++;
+                    const errorMsg = error.message || '网络错误';
+                    errorDetails.push(`第 ${i + 1} 条: ${errorMsg}`);
+                    console.error(`第 ${i + 1} 条导入异常:`, error);
+                }
+                
+                // 添加小延迟，避免数据库压力过大
+                if (i < importData.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+            
+            // 显示导入结果
+            let resultMessage = `导入完成：成功${successCount}条，失败${failCount}条`;
+            if (errorDetails.length > 0) {
+                resultMessage += '\n\n失败详情：\n' + errorDetails.slice(0, 10).join('\n');
+                if (errorDetails.length > 10) {
+                    resultMessage += `\n...还有${errorDetails.length - 10}条错误`;
+                }
+            }
+            
+            alert(resultMessage);
+            fetchHostList();
         }
 
         // 导出按钮逻辑

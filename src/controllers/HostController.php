@@ -25,27 +25,45 @@ class HostController
 
     public function create()
     {
-        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-        $result = $this->model->create($input);
-        
-        if (!headers_sent()) {
-            header('Content-Type: application/json');
-        }
-        
-        if (is_array($result) && isset($result['error'])) {
-            echo json_encode(['code' => 1, 'msg' => $result['error']]);
-        } else {
-            if ($result) {
-                // 记录主机创建日志 - 使用正确的字段名
-                $hostName = ($input['department'] ?? '') . '-' . ($input['user'] ?? '') . 
-                           (empty($input['ip']) ? '' : '(' . $input['ip'] . ')') ?: 'Unknown';
-                try {
-                    $this->logService->logOperation('create_host', 'host', "创建主机: {$hostName}", $input);
-                } catch (\Throwable $logError) {
-                    error_log('Host create log failed: ' . $logError->getMessage());
+        try {
+            $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+            
+            // 基本数据验证
+            if (empty($input['department']) || empty($input['user'])) {
+                if (!headers_sent()) {
+                    header('Content-Type: application/json');
                 }
+                echo json_encode(['code' => 1, 'msg' => '部门和使用人员为必填项']);
+                exit;
             }
-            echo json_encode(['code' => $result ? 0 : 1]);
+            
+            $result = $this->model->create($input);
+            
+            if (!headers_sent()) {
+                header('Content-Type: application/json');
+            }
+            
+            if (is_array($result) && isset($result['error'])) {
+                echo json_encode(['code' => 1, 'msg' => $result['error']]);
+            } else {
+                if ($result) {
+                    // 记录主机创建日志 - 使用正确的字段名
+                    $hostName = ($input['department'] ?? '') . '-' . ($input['user'] ?? '') . 
+                               (empty($input['ip']) ? '' : '(' . $input['ip'] . ')') ?: 'Unknown';
+                    try {
+                        $this->logService->logOperation('create_host', 'host', "创建主机: {$hostName}", $input);
+                    } catch (\Throwable $logError) {
+                        error_log('Host create log failed: ' . $logError->getMessage());
+                    }
+                }
+                echo json_encode(['code' => $result ? 0 : 1, 'msg' => $result ? '创建成功' : '创建失败']);
+            }
+        } catch (\Throwable $e) {
+            error_log('HostController create error: ' . $e->getMessage());
+            if (!headers_sent()) {
+                header('Content-Type: application/json');
+            }
+            echo json_encode(['code' => 1, 'msg' => '服务器内部错误: ' . $e->getMessage()]);
         }
         exit;
     }

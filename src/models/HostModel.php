@@ -36,45 +36,71 @@ class HostModel
 
     public function create($data)
     {
-        // 新增：前置校验（仅在提供了合法IP时校验）
-        $ip = isset($data['ip']) ? trim($data['ip']) : '';
-        if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
-            if (!$this->ipExists($ip)) {
-                $seg = $this->findSegmentForIp($ip);
-                if (!$seg) {
-                    // 同时没有IP和网段 -> 阻止保存
-                    return ['error' => '请先去“IP地址管理”添加该IP所属的IP段'];
+        try {
+            // 新增：前置校验（仅在提供了合法IP时校验）
+            $ip = isset($data['ip']) ? trim($data['ip']) : '';
+            if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
+                try {
+                    if (!$this->ipExists($ip)) {
+                        $seg = $this->findSegmentForIp($ip);
+                        if (!$seg) {
+                            // 同时没有IP和网段 -> 阻止保存
+                            return ['error' => '请先去"IP地址管理"添加该IP所属的IP段'];
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // IP校验失败不阻止创建，只记录错误
+                    error_log('Host IP validation error: ' . $e->getMessage());
                 }
             }
-        }
 
-        $sql = "INSERT INTO host (department, user, cpu, memory, disk, ip, mac, host_number, monitor_number, printer_number, account, supplier, remark, updated_at, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-        $stmt = $this->pdo->prepare($sql);
-        $ok = $stmt->execute([
-            $data['department'] ?? '',
-            $data['user'] ?? '',
-            $data['cpu'] ?? '',
-            $data['memory'] ?? '',
-            $data['disk'] ?? '',
-            $data['ip'] ?? '',
-            $data['mac'] ?? '',
-            $data['host_number'] ?? '',
-            $data['monitor_number'] ?? '',
-            $data['printer_number'] ?? '',
-            $data['account'] ?? '',
-            $data['supplier'] ?? '',
-            $data['remark'] ?? '',
-            $data['updated_at'] ?? date('Y-m-d H:i:s')
-        ]);
+            $sql = "INSERT INTO host (department, user, cpu, memory, disk, ip, mac, host_number, monitor_number, printer_number, account, supplier, remark, updated_at, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+            $stmt = $this->pdo->prepare($sql);
+            
+            // 处理updated_at字段，如果为空则使用当前时间
+            $updatedAt = $data['updated_at'] ?? '';
+            if (empty($updatedAt) || $updatedAt === '') {
+                $updatedAt = date('Y-m-d H:i:s');
+            }
+            
+            $ok = $stmt->execute([
+                $data['department'] ?? '',
+                $data['user'] ?? '',
+                $data['cpu'] ?? '',
+                $data['memory'] ?? '',
+                $data['disk'] ?? '',
+                $data['ip'] ?? '',
+                $data['mac'] ?? '',
+                $data['host_number'] ?? '',
+                $data['monitor_number'] ?? '',
+                $data['printer_number'] ?? '',
+                $data['account'] ?? '',
+                $data['supplier'] ?? '',
+                $data['remark'] ?? '',
+                $updatedAt
+            ]);
 
-        // 新增：成功后同步到 IP 地址管理
-        if ($ok) {
-            $this->syncIpAddress($data);
-            // 新增：成功后同步到显示器管理（仅部门、使用人，且仅非空覆盖）
-            $this->syncMonitorFromHost($data);
+            // 新增：成功后同步到 IP 地址管理和显示器管理（包装在try-catch中，避免影响主流程）
+            if ($ok) {
+                try {
+                    $this->syncIpAddress($data);
+                } catch (\Throwable $e) {
+                    error_log('Host syncIpAddress error: ' . $e->getMessage());
+                }
+                
+                try {
+                    $this->syncMonitorFromHost($data);
+                } catch (\Throwable $e) {
+                    error_log('Host syncMonitorFromHost error: ' . $e->getMessage());
+                }
+            }
+            return $ok;
+        } catch (\Throwable $e) {
+            error_log('HostModel create error: ' . $e->getMessage());
+            error_log('HostModel create data: ' . json_encode($data));
+            return ['error' => '数据库插入失败: ' . $e->getMessage()];
         }
-        return $ok;
     }
 
     public function update($id, $data)
