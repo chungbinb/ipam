@@ -59,35 +59,59 @@ if ($requestUri === '/favicon.ico') {
     exit;
 }
 
+// 移动设备检测函数
+function isMobileDevice() {
+    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    return preg_match('/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i', $userAgent);
+}
+
 // 静态文件处理（仅处理根路径）
 if ($requestUri === '/') {
     // 检查登录状态
     try {
         $session = $authMiddleware->checkAuth();
         if ($session) {
-            // 已登录，重定向到主页
-            if (!headers_sent()) {
-                header('Location: /public/index.html');
+            // 已登录，检查是否为移动设备
+            if (isMobileDevice() && !isset($_GET['desktop'])) {
+                // 移动设备重定向到手机版页面
+                if (!headers_sent()) {
+                    header('Location: /public/mobile.html');
+                }
+                exit;
+            } else {
+                // 桌面设备或强制桌面版，重定向到主页
+                if (!headers_sent()) {
+                    header('Location: /public/index.html');
+                }
+                exit;
             }
-            exit;
         }
     } catch (Exception $e) {
-        // 认证失败，checkAuth方法会处理重定向到登录页面
-        return;
+        // 认证失败，检查是否为移动设备
+        if (isMobileDevice() && !isset($_GET['desktop'])) {
+            // 移动设备重定向到登录页面（移动版会自动检测）
+            if (!headers_sent()) {
+                header('Location: /public/login.html?mobile=1');
+            }
+            exit;
+        } else {
+            // checkAuth方法会处理重定向到登录页面
+            return;
+        }
     }
 }
 
-// 登录页面不需要验证
-if ($requestUri === '/public/login.html') {
-    readfile(__DIR__ . '/public/login.html');
+// 登录页面和手机版页面不需要验证
+if ($requestUri === '/public/login.html' || $requestUri === '/public/mobile.html') {
+    readfile(__DIR__ . '/public/' . basename($requestUri));
     return;
 }
 
 if (preg_match('#^/public/(.+)$#', $requestUri, $matches)) {
     $file = __DIR__ . '/public/' . $matches[1];
     if (file_exists($file)) {
-        // 新增：除了登录页，其他页面都需要验证
-        if ($matches[1] !== 'login.html') {
+        // 新增：除了登录页和手机版页面，其他页面都需要验证
+        if ($matches[1] !== 'login.html' && $matches[1] !== 'mobile.html') {
             $authMiddleware->checkAuth();
         }
 

@@ -42,8 +42,10 @@
         }
         .nav-mini .user-section .user-profile {
             justify-content: center;
+        }        .nav-mini .user-section #logoutBtn span {
+            display: none;
         }
-        .nav-mini .user-section #logoutBtn span {
+        .nav-mini .user-section #mobileBtn span {
             display: none;
         }
     </style>
@@ -69,12 +71,17 @@
                         <span class="online-indicator" style="width: 6px; height: 6px; background: #00ff88; border-radius: 50%; display: inline-block;"></span>
                     </div>
                 </div>
-            </div>
-            <button id="logoutBtn" style="width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            </div>            <button id="logoutBtn" style="width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 8px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M16 17v-3H9v-4h7V7l5 5-5 5M14 2a2 2 0 0 1 2 2v2h-2V4H5v16h9v-2h2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9Z"/>
                 </svg>
                 <span>退出登录</span>
+            </button>
+            <button id="mobileBtn" onclick="switchToMobile()" style="width: 100%; background: rgba(102, 126, 234, 0.2); border: 1px solid rgba(102, 126, 234, 0.5); color: #fff; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17 2H7C5.9 2 5 2.9 5 4v16c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM7 4h10v16H7V4zm2 14h6v-1H9v1z"/>
+                </svg>
+                <span>手机版</span>
             </button>
         </div>
     </div>
@@ -414,8 +421,14 @@
                 .catch(() => {
                     window.location.href = './login.html';
                 });
+            }        });
+
+        // 切换到手机版
+        function switchToMobile() {
+            if (confirm('即将切换到手机版界面，适合在移动设备上使用。是否继续？')) {
+                window.location.href = '/public/mobile.html?mobile=1';
             }
-        });
+        }
 
         // 收起/展开导航
         $('#mini').click(function() {
